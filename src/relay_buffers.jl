@@ -1,6 +1,5 @@
 using CUDA
 using KernelAbstractions
-using MPI
 using StaticArrays
 
 @enum RelayBufferKind begin
@@ -10,15 +9,13 @@ end
 
 Base.similar(::Type{A}, ::Type{FT}, dims...) where {A <: Array, FT} =
     similar(Array{FT}, dims...)
-
 Base.similar(::Type{A}, ::Type{FT}, dims...) where {A <: CuArray, FT} =
     similar(CuArray{FT}, dims...)
-
 
 device(::Union{Array, SArray, MArray}) = CPU()
 device(::CUDA.CuArray) = CUDADevice()
 
-"""
+#=
     RelayBuffer{T}(::Type{A}, kind, dims...; pinned = true)
 
 A RelayBuffer abstracts storage for communication; it is used for
@@ -37,10 +34,9 @@ staging data and for transfers. When running on:
 - `T`: element type
 - `A::Type`: what kind of array to allocate for `stage`
 - `kind::RelayBufferKind`: either `SingleRelayBuffer` or
-  `DoubleRelayBuffer`, or `missing` to indicate that the kind should
-  be determined from `A` and by asking MPI
+  `DoubleRelayBuffer`
 - `dims...`: dimensions of the array
-"""
+=#
 struct RelayBuffer{T, A, Buff}
     stage::A
     transfer::Buff # Union{Nothing,Buff}
@@ -48,13 +44,6 @@ struct RelayBuffer{T, A, Buff}
     function RelayBuffer{T}(::Type{A}, kind, dims...) where {T, A}
         stage = similar(A, T, dims...)
 
-        if ismissing(kind)
-            if stage isa Array || MPI.has_cuda()
-                kind = SingleRelayBuffer
-            else
-                kind = DoubleRelayBuffer
-            end
-        end
         if kind == SingleRelayBuffer
             transfer = nothing
         elseif kind == DoubleRelayBuffer

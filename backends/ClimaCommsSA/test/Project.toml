@@ -1,0 +1,5 @@
+[deps]
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+ClimaCommsSA = "a6c56aa3-fa23-4519-bde3-677c3f742353"
+OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"

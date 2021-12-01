@@ -1,0 +1,10 @@
+name = "ClimaCommsSA"
+uuid = "a6c56aa3-fa23-4519-bde3-677c3f742353"
+authors = ["CliMA Contributors <clima-software@caltech.edu>"]
+version = "0.1.0"
+
+[deps]
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
+KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
+SharedArrays = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
