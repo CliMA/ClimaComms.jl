@@ -35,12 +35,20 @@ jobs:
             - 'src/**'
             - 'test/**'
             - 'Project.toml'
+            - 'backends/ClimaCommsMPI/src/**'
+            - 'backends/ClimaCommsMPI/test/**'
+            - 'backends/ClimaCommsMPI/Project.toml'
+            - 'backends/ClimaCommsMPI/test/Project.toml'
+            - 'backends/ClimaCommsSA/src/**'
+            - 'backends/ClimaCommsSA/test/**'
+            - 'backends/ClimaCommsSA/Project.toml'
+            - 'backends/ClimaCommsSA/test/Project.toml'
 
     - name: Set up Julia
       uses: julia-actions/setup-julia@latest
       if: steps.filter.outputs.run_test == 'true'
       with:
-        version: 1.6
+        version: 1.7
 
     - name: Cache artifacts
       uses: actions/cache@v1
@@ -61,25 +69,38 @@ jobs:
         julia --color=yes --project -e 'using Pkg; Pkg.instantiate()'
         julia --color=yes --project -e 'using Pkg; Pkg.precompile(;strict=true)'
         julia --color=yes --project -e 'using Pkg; Pkg.status()'
+        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.instantiate()'
+        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.status()'
+        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.instantiate()'
+        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status()'
 
     - name: Project Manifest
       if: steps.filter.outputs.run_test == 'true'
       run: |
         julia --color=no --project -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
+        julia --color=no --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
+        julia --color=no --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
 
     - name: Install Project Test Packages
       if: steps.filter.outputs.run_test == 'true'
       run: |
-        julia --color=yes --project=test -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.instantiate()'
-        julia --color=yes --project=test -e 'using Pkg; Pkg.precompile(;strict=true)'
-        julia --color=yes --project=test -e 'using Pkg; Pkg.status()'
+        julia --color=yes --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.develop([PackageSpec(path=pwd()), PackageSpec(path=joinpath(pwd(), "backends", "ClimaCommsMPI"))]); Pkg.instantiate()'
+        julia --color=yes --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.status()'
+        julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.develop([PackageSpec(path=pwd()), PackageSpec(path=joinpath(pwd(), "backends", "ClimaCommsSA"))]); Pkg.instantiate()'
+        julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.status()'
 
     - name: Project Test Manifest
       if: steps.filter.outputs.run_test == 'true'
       run: |
-        julia --color=no --project=test -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
+        julia --color=no --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
+        julia --color=no --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
 
     - name: Run Unit Tests
       if: steps.filter.outputs.run_test == 'true'
       run: |
-        julia --color=yes --project=test test/runtests.jl
+        julia --color=yes --project=backends/ClimaCommsMPI/test backends/ClimaCommsMPI/test/runtests.jl
+        julia --color=yes --project=backends/ClimaCommsSA/test backends/ClimaCommsSA/test/runtests.jl
