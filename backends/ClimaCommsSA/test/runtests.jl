@@ -1,11 +1,17 @@
 using Distributed
 using Test
 
+@assert nprocs() == 1
+addprocs(3, exeflags = "--project=$(Base.active_project())")
+
+@everywhere begin
+    using Distributed
+    using SharedArrays
+    using ClimaComms
+    using ClimaCommsSA
+    include(joinpath(@__DIR__, "..", "..", "..", "test", "stencil.jl"))
+end
+
 @testset "Stencil" begin
-    if nprocs() < 4
-        addprocs(4 - nprocs(), exeflags="--project=$(Base.active_project())")
-    end
-    @everywhere using Distributed, SharedArrays, Pkg
-    @everywhere Pkg.activate($(Base.active_project()))
-    @everywhere include(joinpath(@__DIR__, "sa_stencil.jl"))
+    @everywhere stencil_test(ClimaCommsSA.SACommsContext, niterations = 100)
 end

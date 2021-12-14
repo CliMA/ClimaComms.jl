@@ -1,6 +1,7 @@
 name: OS Tests
 
 on:
+  pull_request:
   push:
     branches:
       - main
@@ -9,7 +10,6 @@ jobs:
   test-os:
     timeout-minutes: 60
     strategy:
-      fail-fast: true
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
 
@@ -76,13 +76,6 @@ jobs:
         julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.precompile(;strict=true)'
         julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status()'
 
-    - name: Project Manifest
-      if: steps.filter.outputs.run_test == 'true'
-      run: |
-        julia --color=no --project -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
-        julia --color=no --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
-        julia --color=no --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
-
     - name: Install Project Test Packages
       if: steps.filter.outputs.run_test == 'true'
       run: |
@@ -93,14 +86,12 @@ jobs:
         julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.precompile(;strict=true)'
         julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.status()'
 
-    - name: Project Test Manifest
+    - name: Run Shared Arrays Unit Tests
       if: steps.filter.outputs.run_test == 'true'
       run: |
-        julia --color=no --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
-        julia --color=no --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.status(mode=Pkg.PKGMODE_MANIFEST)'
+        julia --color=yes --project=backends/ClimaCommsSA/test backends/ClimaCommsSA/test/runtests.jl
 
-    - name: Run Unit Tests
+    - name: Run MPI Unit Tests
       if: steps.filter.outputs.run_test == 'true'
       run: |
         julia --color=yes --project=backends/ClimaCommsMPI/test backends/ClimaCommsMPI/test/runtests.jl
-        julia --color=yes --project=backends/ClimaCommsSA/test backends/ClimaCommsSA/test/runtests.jl

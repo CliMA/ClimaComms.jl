@@ -31,8 +31,7 @@ mutable struct CCReducer{FT}
         sense = SharedArray{Bool}((1,), init = (sa) -> sa[1] = false)
         worker_sense =
             SharedArray{Bool}((nprocs(),), init = (sa) -> fill!(sa, false))
-        vals =
-            SharedArray{FT}((nprocs(),), init = (sa) -> fill!(sa, zero(FT)))
+        vals = SharedArray{FT}((nprocs(),), init = (sa) -> fill!(sa, zero(FT)))
         new(sense, worker_sense, vals)
     end
 end
