@@ -48,7 +48,7 @@ struct SACommsContext <: ClimaComms.AbstractCommsContext
             red64 = CCReducer{Float64}()
             red32 = CCReducer{Float32}()
             if nprocs() > 1
-                for i in 1:nworkers()
+                for i in 1:nprocs()
                     put!(ClimaCommsSA.get_ctx_chnl(), (barr, red64, red32))
                 end
             end
