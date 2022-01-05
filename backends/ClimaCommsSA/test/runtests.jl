@@ -13,5 +13,5 @@ addprocs(3, exeflags = "--project=$(Base.active_project())")
 end
 
 @testset "Stencil" begin
-    @everywhere stencil_test(ClimaCommsSA.SACommsContext, niterations = 100)
+    @everywhere stencil_test(ClimaCommsSA.SACommsContext)
 end

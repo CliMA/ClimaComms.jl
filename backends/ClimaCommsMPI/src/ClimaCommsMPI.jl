@@ -51,9 +51,7 @@ function Neighbor(
 end
 
 function ClimaComms.init(::Type{MPICommsContext})
-    if MPI.Initialized()
-        @warn "MPI has already been initialized."
-    else
+    if !MPI.Initialized()
         MPI.Init()
         atexit() do
             MPI.Finalize()
@@ -79,14 +77,12 @@ function ClimaComms.start(ctx::MPICommsContext; dependencies = nothing)
     nneighbors = length(ctx.neighbors)
 
     # start moving staged send data to transfer buffers
-    events = ()
-    for n in 1:nneighbors
-        event = ClimaComms.prepare_transfer!(
+    events = ntuple(nneighbors) do n
+        ClimaComms.prepare_transfer!(
             ctx.neighbors[n].send_buf,
             dependencies = dependencies,
             progress = progress,
         )
-        events = (event, events...)
     end
 
     # post receives
@@ -129,22 +125,18 @@ function ClimaComms.finish(ctx::MPICommsContext; dependencies = nothing)
 
     # wait on previous receives
     MPI.Waitall!(ctx.recv_reqs)
-    fill!(ctx.recv_reqs, MPI.REQUEST_NULL)
 
     # move received data to stage buffers
-    events = ()
-    for n in 1:nneighbors
-        event = ClimaComms.prepare_stage!(
+    events = ntuple(nneighbors) do n
+        ClimaComms.prepare_stage!(
             ClimaComms.recv_buffer(ctx.neighbors[n]);
             dependencies = dependencies,
             progress = progress,
         )
-        events = (event, events...)
     end
 
     # ensure that sends have completed
     MPI.Waitall!(ctx.send_reqs)
-    fill!(ctx.send_reqs, MPI.REQUEST_NULL)
 
     return MultiEvent(events)
 end
