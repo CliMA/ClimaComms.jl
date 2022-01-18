@@ -34,6 +34,7 @@ tuple of the processor ID and the number of participating processors.
 function init(::Type{CC}) where {CC <: AbstractCommsContext}
     error("No `init` method defined for $CC")
 end
+init(::Nothing) = nothing
 
 """
     mypid(::Type{CC}) where {CC <: AbstractCommsContext}
@@ -41,6 +42,7 @@ end
 Return the processor ID.
 """
 function mypid end
+mypid(::Nothing) = 1
 
 """
     iamroot(::Type{CC}) where {CC <: AbstractCommsContext}
@@ -48,6 +50,7 @@ function mypid end
 Return `true` if the calling processor is the root processor.
 """
 function iamroot end
+iamroot(::Nothing) = true
 
 """
     nprocs(::Type{CC}) where {CC <: AbstractCommsContext}
@@ -55,6 +58,7 @@ function iamroot end
 Return the number of participating processors.
 """
 function nprocs end
+nprocs(::Nothing) = 1
 
 """
     singlebuffered(::Type{CC}) where {CC <: AbstractCommsContext}
@@ -62,6 +66,7 @@ function nprocs end
 Returns `true` if communication can be single-buffered.
 """
 function singlebuffered end
+singlebuffered(::Nothing) = true
 
 """
     start(ctx::CC; kwargs...) where {CC <: AbstractCommsContext}
@@ -70,6 +75,7 @@ Initiate communication. The stage areas of all the send `RelayBuffer`s
 must be filled before this is called!
 """
 function start end
+start(::Nothing) = nothing
 
 """
     progress(ctx::CC) where {CC <: AbstractCommsContext}
@@ -78,6 +84,7 @@ Drive communication. Call after `start()` to ensure that communication
 proceeds asynchronously.
 """
 function progress end
+progress(::Nothing) = nothing
 
 """
     finish(ctx::CC; kwargs...) where {CC <: AbstractCommsContext}
@@ -87,6 +94,7 @@ data received from all neighbors will be available in the stage areas of
 each neighbor's receive buffer.
 """
 function finish end
+finish(::Nothing) = nothing
 
 """
     barrier(ctx::CC) where {CC <: AbstractCommsContext}
@@ -94,6 +102,7 @@ function finish end
 Perform a global synchronization across all participating processors.
 """
 function barrier end
+barrier(::Nothing) = nothing
 
 """
     reduce(ctx::CC, val, op) where {CC <: AbstractCommsContext}
@@ -103,6 +112,7 @@ the reduction operator and `val` as this rank's reduction value. Return
 the result to the first processor only.
 """
 function reduce end
+reduce(::Nothing, val, op) = val
 
 """
     abort(ctx::CC, status::Int) where {CC <: AbstractCommsContext}
@@ -111,6 +121,7 @@ Terminate the caller and all participating processors with the specified
 `status`.
 """
 function abort end
+abort(::Nothing, status::Int) = exit(status)
 
 include("relay_buffers.jl")
 include("neighbors.jl")
