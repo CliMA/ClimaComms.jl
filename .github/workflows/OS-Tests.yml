@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 60
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -69,29 +69,30 @@ jobs:
         julia --color=yes --project -e 'using Pkg; Pkg.instantiate()'
         julia --color=yes --project -e 'using Pkg; Pkg.precompile(;strict=true)'
         julia --color=yes --project -e 'using Pkg; Pkg.status()'
-        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.instantiate()'
-        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.precompile(;strict=true)'
-        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.status()'
-        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.instantiate()'
-        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.precompile(;strict=true)'
-        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status()'
+        julia --color=yes --project=backends\/ClimaCommsMPI -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.instantiate()'
+        julia --color=yes --project=backends\/ClimaCommsMPI -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends\/ClimaCommsMPI -e 'using Pkg; Pkg.status()'
+        julia --color=yes --project=backends\/ClimaCommsSA -e 'using Pkg; Pkg.develop(path=pwd()); Pkg.instantiate()'
+        julia --color=yes --project=backends\/ClimaCommsSA -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends\/ClimaCommsSA -e 'using Pkg; Pkg.status()'
 
     - name: Install Project Test Packages
       if: steps.filter.outputs.run_test == 'true'
       run: |
-        julia --color=yes --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.develop([PackageSpec(path=pwd()), PackageSpec(path=joinpath(pwd(), "backends", "ClimaCommsMPI"))]); Pkg.instantiate()'
-        julia --color=yes --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.precompile(;strict=true)'
-        julia --color=yes --project=backends/ClimaCommsMPI/test -e 'using Pkg; Pkg.status()'
-        julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.develop([PackageSpec(path=pwd()), PackageSpec(path=joinpath(pwd(), "backends", "ClimaCommsSA"))]); Pkg.instantiate()'
-        julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.precompile(;strict=true)'
-        julia --color=yes --project=backends/ClimaCommsSA/test -e 'using Pkg; Pkg.status()'
-
-    - name: Run Shared Arrays Unit Tests
-      if: steps.filter.outputs.run_test == 'true'
-      run: |
-        julia --color=yes --project=backends/ClimaCommsSA/test backends/ClimaCommsSA/test/runtests.jl
+        julia --color=yes --project=backends\/ClimaCommsMPI\/test -e 'using Pkg; Pkg.develop([PackageSpec(path=pwd()), PackageSpec(path=joinpath(pwd(), "backends", "ClimaCommsMPI"))]); Pkg.instantiate()'
+        julia --color=yes --project=backends\/ClimaCommsMPI\/test -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends\/ClimaCommsMPI\/test -e 'using Pkg; Pkg.status()'
+        julia --color=yes --project=backends\/ClimaCommsSA\/test -e 'using Pkg; Pkg.develop([PackageSpec(path=pwd()), PackageSpec(path=joinpath(pwd(), "backends", "ClimaCommsSA"))]); Pkg.instantiate()'
+        julia --color=yes --project=backends\/ClimaCommsSA\/test -e 'using Pkg; Pkg.precompile(;strict=true)'
+        julia --color=yes --project=backends\/ClimaCommsSA\/test -e 'using Pkg; Pkg.status()'
 
     - name: Run MPI Unit Tests
       if: steps.filter.outputs.run_test == 'true'
       run: |
-        julia --color=yes --project=backends/ClimaCommsMPI/test backends/ClimaCommsMPI/test/runtests.jl
+        julia --color=yes --project=backends\/ClimaCommsMPI\/test backends\/ClimaCommsMPI\/test\/runtests.jl
+
+# Re-enable this when https://github.com/CliMA/ClimaComms.jl/issues/6 is fixed
+#    - name: Run Shared Arrays Unit Tests
+#      if: steps.filter.outputs.run_test == 'true'
+#      run: |
+#        julia --color=yes --project=backends\/ClimaCommsSA\/test backends\/ClimaCommsSA\/test\/runtests.jl
