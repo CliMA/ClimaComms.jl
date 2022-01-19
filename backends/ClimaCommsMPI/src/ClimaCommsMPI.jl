@@ -67,6 +67,7 @@ ClimaComms.iamroot(CC::Type{MPICommsContext}) = ClimaComms.mypid(CC) == 1
 ClimaComms.nprocs(::Type{MPICommsContext}) = MPI.Comm_size(MPI.COMM_WORLD)
 ClimaComms.nprocs(ctx::MPICommsContext) = MPI.Comm_size(ctx.mpicomm)
 ClimaComms.singlebuffered(::Type{MPICommsContext}) = MPI.has_cuda()
+ClimaComms.neighbors(ctx::MPICommsContext) = ctx.neighbors
 
 function ClimaComms.start(ctx::MPICommsContext; dependencies = nothing)
     if !all(r -> r == MPI.REQUEST_NULL, ctx.recv_reqs)

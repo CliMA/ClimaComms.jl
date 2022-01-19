@@ -122,6 +122,7 @@ ClimaComms.iamroot(ctx::SACommsContext) = ClimaComms.mypid(ctx) == 1
 ClimaComms.nprocs(::Type{SACommsContext}) = Distributed.nprocs()
 ClimaComms.nprocs(::SACommsContext) = Distributed.nprocs()
 ClimaComms.singlebuffered(::Type{SACommsContext}) = true
+ClimaComms.neighbors(ctx::SACommsContext) = ctx.neighbors
 
 function ClimaComms.start(ctx::SACommsContext; dependencies = nothing) end
 
