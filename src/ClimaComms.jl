@@ -69,6 +69,14 @@ function singlebuffered end
 singlebuffered(::Nothing) = true
 
 """
+    neighbors(ctx::CC) where {CC <: AbstractCommsContext}
+
+Returns an array of `Neighbor`s, as specified to the constructor.
+"""
+function neighbors end
+neighbors(::Nothing) = Neighbor[]
+
+"""
     start(ctx::CC; kwargs...) where {CC <: AbstractCommsContext}
 
 Initiate communication. The stage areas of all the send `RelayBuffer`s
