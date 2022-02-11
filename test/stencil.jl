@@ -8,7 +8,7 @@ using CUDA
 using Logging
 using OffsetArrays
 using Printf
-
+using Test
 using ClimaComms
 
 # defaults for grid dimension, stencil radius, etc.
@@ -322,6 +322,19 @@ function stencil_test(
             flops = (2 * stencil_size + 1) * active_points
             avgtime = stencil_time / niterations
             @info @sprintf "%f MFlops/s\n" 1.0e-6 * flops / avgtime
+        end
+
+        gathered = ClimaComms.gather(
+            comms_ctx,
+            fill(ClimaComms.mypid(comms_ctx), (3, 3)),
+        )
+        if ClimaComms.iamroot(comms_ctx)
+            @test gathered == repeat(
+                reshape(1:ClimaComms.nprocs(comms_ctx), (1, :)),
+                inner = (3, 3),
+            )
+        else
+            @test isnothing(gathered)
         end
     end
 

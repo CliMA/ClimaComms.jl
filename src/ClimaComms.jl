@@ -123,6 +123,14 @@ function reduce end
 reduce(::Nothing, val, op) = val
 
 """
+    gather(ctx::AbstractCommsContext, array)
+
+Gather an array of values from all processors into a single array,
+concattenating along the last dimension.
+"""
+gather(::Nothing, array) = array
+
+"""
     abort(ctx::CC, status::Int) where {CC <: AbstractCommsContext}
 
 Terminate the caller and all participating processors with the specified

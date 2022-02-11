@@ -1,6 +1,3 @@
-push!(LOAD_PATH, joinpath(@__DIR__, ".."))
-push!(LOAD_PATH, joinpath(@__DIR__, "..", ".."))
-
 using ClimaComms
 using ClimaCommsMPI
 
