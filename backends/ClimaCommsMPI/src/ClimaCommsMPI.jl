@@ -64,6 +64,7 @@ end
 ClimaComms.mypid(::Type{MPICommsContext}) = MPI.Comm_rank(MPI.COMM_WORLD) + 1
 ClimaComms.mypid(ctx::MPICommsContext) = MPI.Comm_rank(ctx.mpicomm) + 1
 ClimaComms.iamroot(CC::Type{MPICommsContext}) = ClimaComms.mypid(CC) == 1
+ClimaComms.iamroot(ctx::MPICommsContext) = ClimaComms.mypid(ctx) == 1
 ClimaComms.nprocs(::Type{MPICommsContext}) = MPI.Comm_size(MPI.COMM_WORLD)
 ClimaComms.nprocs(ctx::MPICommsContext) = MPI.Comm_size(ctx.mpicomm)
 ClimaComms.singlebuffered(::Type{MPICommsContext}) = MPI.has_cuda()
@@ -151,6 +152,19 @@ ClimaComms.barrier(ctx::MPICommsContext) = MPI.Barrier(ctx.mpicomm)
 
 ClimaComms.reduce(ctx::MPICommsContext, val, op) =
     MPI.Reduce(val, op, 0, ctx.mpicomm)
+
+function ClimaComms.gather(ctx::MPICommsContext, array)
+    dims = size(array)
+    lengths = MPI.Gather(dims[end], 0, ctx.mpicomm)
+    if ClimaComms.iamroot(ctx)
+        dimsout = (dims[1:end-1]..., sum(lengths))
+        arrayout = similar(array, dimsout)
+        recvbuf = MPI.VBuffer(arrayout, lengths .* prod(dims[1:end-1]))
+    else
+        recvbuf = nothing
+    end        
+    MPI.Gatherv!(array, recvbuf, 0, ctx.mpicomm)
+end
 
 ClimaComms.abort(ctx::MPICommsContext, status::Int) =
     MPI.Abort(ctx.mpicomm, status)
