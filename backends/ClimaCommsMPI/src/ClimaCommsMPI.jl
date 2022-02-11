@@ -157,12 +157,12 @@ function ClimaComms.gather(ctx::MPICommsContext, array)
     dims = size(array)
     lengths = MPI.Gather(dims[end], 0, ctx.mpicomm)
     if ClimaComms.iamroot(ctx)
-        dimsout = (dims[1:end-1]..., sum(lengths))
+        dimsout = (dims[1:(end - 1)]..., sum(lengths))
         arrayout = similar(array, dimsout)
-        recvbuf = MPI.VBuffer(arrayout, lengths .* prod(dims[1:end-1]))
+        recvbuf = MPI.VBuffer(arrayout, lengths .* prod(dims[1:(end - 1)]))
     else
         recvbuf = nothing
-    end        
+    end
     MPI.Gatherv!(array, recvbuf, 0, ctx.mpicomm)
 end
 
