@@ -53,9 +53,6 @@ end
 function ClimaComms.init(::Type{MPICommsContext})
     if !MPI.Initialized()
         MPI.Init()
-        atexit() do
-            MPI.Finalize()
-        end
     end
 
     return ClimaComms.mypid(MPICommsContext), ClimaComms.nprocs(MPICommsContext)
