@@ -93,17 +93,17 @@ function setup_input(AT, FT, height, cstart, cend, width, rstart, rend, radius)
 end
 
 # fill the send stage buffer for the specified neighbor from `input`
-function fill_send_buf(nbr, input, rrange, crange)
-    if ClimaComms.pid(nbr) > 0
-        buf = ClimaComms.send_stage(nbr)
+function fill_send_buf(npid, neighbors, input, rrange, crange)
+    if npid > 0
+        buf = ClimaComms.send_stage(neighbors[npid])
         buf .= view(input, rrange, crange)
     end
 end
 
 # copy the receive stage buffer for the specified neighbor into `input`
-function empty_recv_buf(nbr, input, rrange, crange)
-    if ClimaComms.pid(nbr) > 0
-        buf = ClimaComms.recv_stage(nbr)
+function empty_recv_buf(npid, neighbors, input, rrange, crange)
+    if npid > 0
+        buf = ClimaComms.recv_stage(neighbors[npid])
         view(input, rrange, crange) .= buf
     end
 end
@@ -176,22 +176,25 @@ function stencil_test(
         outa = AT{FT}(undef, height, width)
         fill!(outa, zero(FT))
         out = OffsetArray(outa, rstart:rend, cstart:cend)
-
+        #---------
         # set up communication buffers for neighbors
         make_neighbor(pid, send_dims, recv_dims = send_dims) =
             ClimaComms.Neighbor(Context, pid, AT, FT, send_dims, recv_dims)
-        neighbors = (;
-            left = make_neighbor(left_nbr, (radius, width)),
-            right = make_neighbor(right_nbr, (radius, width)),
-            top = make_neighbor(top_nbr, (height, radius)),
-            bottom = make_neighbor(bottom_nbr, (height, radius)),
-        )
+        neighbors = Dict{Int, ClimaComms.Neighbor}()
+        if left_nbr > 0
+            neighbors[left_nbr] = make_neighbor(left_nbr, (radius, width))
+        end
+        if right_nbr > 0
+            neighbors[right_nbr] = make_neighbor(right_nbr, (radius, width))
+        end
+        if top_nbr > 0
+            neighbors[top_nbr] = make_neighbor(top_nbr, (height, radius))
+        end
+        if bottom_nbr > 0
+            neighbors[bottom_nbr] = make_neighbor(bottom_nbr, (height, radius))
+        end
 
-        # create ClimaComms context
-        comms_ctx = Context(
-            filter(nbr -> ClimaComms.pid(nbr) > 0, [nbr for nbr in neighbors]),
-        )
-
+        comms_ctx = Context(neighbors)
         # compute loop
         local_stencil_time = 0
         for iter in 0:niterations
@@ -200,28 +203,32 @@ function stencil_test(
                 ClimaComms.barrier(comms_ctx)
                 local_stencil_time = time()
             end
-
+            neighbors = comms_ctx.neighbors
             # fill send buffers
             fill_send_buf(
-                neighbors.left,
+                left_nbr,
+                neighbors,
                 input,
                 rstart:(rstart + radius - 1),
                 cstart:cend,
             )
             fill_send_buf(
-                neighbors.right,
+                right_nbr,
+                neighbors,
                 input,
                 (rend - radius + 1):rend,
                 cstart:cend,
             )
             fill_send_buf(
-                neighbors.top,
+                top_nbr,
+                neighbors,
                 input,
                 rstart:rend,
                 (cend - radius + 1):cend,
             )
             fill_send_buf(
-                neighbors.bottom,
+                bottom_nbr,
+                neighbors,
                 input,
                 rstart:rend,
                 cstart:(cstart + radius - 1),
@@ -244,25 +251,29 @@ function stencil_test(
 
             # move receive buffers to the input array
             empty_recv_buf(
-                neighbors.left,
+                left_nbr,
+                neighbors,
                 input,
                 (rstart - radius):(rstart - 1),
                 cstart:cend,
             )
             empty_recv_buf(
-                neighbors.right,
+                right_nbr,
+                neighbors,
                 input,
                 (rend + 1):(rend + radius),
                 cstart:cend,
             )
             empty_recv_buf(
-                neighbors.top,
+                top_nbr,
+                neighbors,
                 input,
                 rstart:rend,
                 (cend + 1):(cend + radius),
             )
             empty_recv_buf(
-                neighbors.bottom,
+                bottom_nbr,
+                neighbors,
                 input,
                 rstart:rend,
                 (cstart - radius):(cstart - 1),

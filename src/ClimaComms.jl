@@ -71,10 +71,11 @@ singlebuffered(::Nothing) = true
 """
     neighbors(ctx::CC) where {CC <: AbstractCommsContext}
 
-Returns an array of `Neighbor`s, as specified to the constructor.
+Returns a `Dict{Int,Neighbor}` mapping the processor ID to the
+`Neighbor` for that processor.
 """
 function neighbors end
-neighbors(::Nothing) = Neighbor[]
+neighbors(::Nothing) = ()
 
 """
     start(ctx::CC; kwargs...) where {CC <: AbstractCommsContext}
