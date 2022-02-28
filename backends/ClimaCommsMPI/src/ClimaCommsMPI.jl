@@ -8,18 +8,21 @@ using MPI
 
 struct MPICommsContext <: ClimaComms.AbstractCommsContext
     mpicomm::MPI.Comm
-    neighbors::Vector{ClimaComms.Neighbor}
+    neighbors::Dict{Int, ClimaComms.Neighbor}
+    neighbor_pids::Tuple{Vararg{Int}} # we could just use keys(neighbors), but MultiEvents require a Tuple
     recv_reqs::Vector{MPI.Request}
     send_reqs::Vector{MPI.Request}
 
     function MPICommsContext(
-        neighbors::Vector{ClimaComms.Neighbor};
+        neighbors::Dict{Int, ClimaComms.Neighbor};
         mpicomm = MPI.COMM_WORLD,
     )
-        nneighbors = length(neighbors)
+        neighbor_pids = tuple(keys(neighbors)...)
+        nneighbors = length(neighbor_pids)
         new(
             mpicomm,
             neighbors,
+            neighbor_pids,
             fill(MPI.REQUEST_NULL, nneighbors),
             fill(MPI.REQUEST_NULL, nneighbors),
         )
@@ -47,7 +50,7 @@ function Neighbor(
         send_buf = recv_buf = missing
         B = Missing
     end
-    ClimaComms.Neighbor{B}(pid, send_buf, recv_buf)
+    return ClimaComms.Neighbor{B}(send_buf, recv_buf)
 end
 
 function ClimaComms.init(::Type{MPICommsContext})
@@ -73,40 +76,31 @@ function ClimaComms.start(ctx::MPICommsContext; dependencies = nothing)
     end
 
     progress = () -> iprobe_and_yield(ctx.mpicomm)
-    nneighbors = length(ctx.neighbors)
 
     # start moving staged send data to transfer buffers
-    events = ntuple(nneighbors) do n
+    events = map(ctx.neighbor_pids) do pid
         ClimaComms.prepare_transfer!(
-            ctx.neighbors[n].send_buf,
+            ctx.neighbors[pid].send_buf,
             dependencies = dependencies,
             progress = progress,
         )
     end
 
     # post receives
-    for n in 1:nneighbors
-        tbuf = ClimaComms.get_transfer(ClimaComms.recv_buffer(ctx.neighbors[n]))
-        ctx.recv_reqs[n] = MPI.Irecv!(
-            tbuf,
-            ClimaComms.pid(ctx.neighbors[n]) - 1,
-            666,
-            ctx.mpicomm,
-        )
+    for (n, pid) in enumerate(ctx.neighbor_pids)
+        tbuf =
+            ClimaComms.get_transfer(ClimaComms.recv_buffer(ctx.neighbors[pid]))
+        ctx.recv_reqs[n] = MPI.Irecv!(tbuf, pid - 1, 666, ctx.mpicomm)
     end
 
     # wait for send data to reach the transfer buffers
     wait(CPU(), MultiEvent(events), progress)
 
     # post sends
-    for n in 1:nneighbors
-        tbuf = ClimaComms.get_transfer(ClimaComms.send_buffer(ctx.neighbors[n]))
-        ctx.send_reqs[n] = MPI.Isend(
-            tbuf,
-            ClimaComms.pid(ctx.neighbors[n]) - 1,
-            666,
-            ctx.mpicomm,
-        )
+    for (n, pid) in enumerate(ctx.neighbor_pids)
+        tbuf =
+            ClimaComms.get_transfer(ClimaComms.send_buffer(ctx.neighbors[pid]))
+        ctx.send_reqs[n] = MPI.Isend(tbuf, pid - 1, 666, ctx.mpicomm)
     end
 end
 
@@ -120,15 +114,14 @@ function ClimaComms.finish(ctx::MPICommsContext; dependencies = nothing)
     end
 
     progress = () -> iprobe_and_yield(ctx.mpicomm)
-    nneighbors = length(ctx.neighbors)
 
     # wait on previous receives
     MPI.Waitall!(ctx.recv_reqs)
 
     # move received data to stage buffers
-    events = ntuple(nneighbors) do n
+    events = map(ctx.neighbor_pids) do pid
         ClimaComms.prepare_stage!(
-            ClimaComms.recv_buffer(ctx.neighbors[n]);
+            ClimaComms.recv_buffer(ctx.neighbors[pid]);
             dependencies = dependencies,
             progress = progress,
         )
