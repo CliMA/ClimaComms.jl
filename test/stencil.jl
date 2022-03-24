@@ -23,8 +23,6 @@ const default_float_types = (Float64, Float32)
 #const default_array_types = CUDA.has_cuda() ? (CuArray, Array) : (Array,)
 const default_array_types = (Array,)
 
-puts(s...) = ccall(:puts, Cint, (Cstring,), string(s...))
-
 epsilon(::Type{Float64}) = 1.0e-8
 epsilon(::Type{Float32}) = 0.0001f0
 coefx(::Type{Float64}) = 1.0

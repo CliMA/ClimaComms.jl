@@ -26,84 +26,34 @@ in an array of `Neighbor`s.
 abstract type AbstractCommsContext end
 
 """
-    init(::Type{CC}) where {CC <: AbstractCommsContext}
+    (pid, nprocs) = init(ctx::AbstractCommsContext)
 
 Perform any necessary initialization for the specified backend. Return a
 tuple of the processor ID and the number of participating processors.
 """
-function init(::Type{CC}) where {CC <: AbstractCommsContext}
-    error("No `init` method defined for $CC")
-end
-init(::Nothing) = nothing
+function init end
 
 """
-    mypid(::Type{CC}) where {CC <: AbstractCommsContext}
+    mypid(ctx::AbstractCommsContext)
 
 Return the processor ID.
 """
 function mypid end
-mypid(::Nothing) = 1
 
 """
-    iamroot(::Type{CC}) where {CC <: AbstractCommsContext}
+    iamroot(ctx::AbstractCommsContext)
 
 Return `true` if the calling processor is the root processor.
 """
 function iamroot end
-iamroot(::Nothing) = true
 
 """
-    nprocs(::Type{CC}) where {CC <: AbstractCommsContext}
+    nprocs(ctx::AbstractCommsContext)
 
 Return the number of participating processors.
 """
 function nprocs end
-nprocs(::Nothing) = 1
 
-"""
-    singlebuffered(::Type{CC}) where {CC <: AbstractCommsContext}
-
-Returns `true` if communication can be single-buffered.
-"""
-function singlebuffered end
-singlebuffered(::Nothing) = true
-
-"""
-    neighbors(ctx::CC) where {CC <: AbstractCommsContext}
-
-Returns a `Dict{Int,Neighbor}` mapping the processor ID to the
-`Neighbor` for that processor.
-"""
-function neighbors end
-neighbors(::Nothing) = ()
-
-"""
-    start(ctx::CC; kwargs...) where {CC <: AbstractCommsContext}
-
-Initiate communication. The stage areas of all the send `RelayBuffer`s
-must be filled before this is called!
-"""
-function start end
-start(::Nothing) = nothing
-
-"""
-    progress(ctx::CC) where {CC <: AbstractCommsContext}
-
-Drive communication. Call after `start()` to ensure that communication
-proceeds asynchronously.
-"""
-function progress end
-progress(::Nothing) = nothing
-
-"""
-    finish(ctx::CC; kwargs...) where {CC <: AbstractCommsContext}
-
-Complete the communications step begun by `start()`. After this returns,
-data received from all neighbors will be available in the stage areas of
-each neighbor's receive buffer.
-"""
-function finish end
-finish(::Nothing) = nothing
 
 """
     barrier(ctx::CC) where {CC <: AbstractCommsContext}
@@ -140,7 +90,52 @@ Terminate the caller and all participating processors with the specified
 function abort end
 abort(::Nothing, status::Int) = exit(status)
 
-include("relay_buffers.jl")
-include("neighbors.jl")
+
+abstract type AbstractGraphContext end
+
+"""
+    graph_context(context::AbstractCommsContext, sendarray, sendpids, sendlengths, recvarray, recvpids, recvlengths)
+
+Construct a communication context for exchanging neighbor data via a graph.
+
+Arguments:
+- `context`: the communication context on which to construct the graph context.
+- `sendarray`: array containing data to send
+- `sendpids`: list of processor IDs to send
+- `sendlengths`: list of lengths of data to send to each process ID
+- `recvarray`: array to receive data into
+- `recvpids`: list of processor IDs to receive from
+- `recvlengths`: list of lengths of data to receive from each process ID
+
+This should return an `AbstractGraphContext` object.
+"""
+function graph_context end
+
+
+"""
+    start(ctx::AbstractGraphContext)
+
+Initiate graph data exchange.
+"""
+function start end
+
+"""
+    progress(ctx::AbstractGraphContext)
+
+Drive communication. Call after `start` to ensure that communication
+proceeds asynchronously.
+"""
+function progress end
+
+"""
+    finish(ctx::AbstractGraphContext)
+
+Complete the communications step begun by `start()`. After this returns,
+data received from all neighbors will be available in the stage areas of
+each neighbor's receive buffer.
+"""
+function finish end
+
+include("singleton.jl")
 
 end # module
