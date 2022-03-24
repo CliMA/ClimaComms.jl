@@ -8,135 +8,20 @@ using MPI
 
 struct MPICommsContext <: ClimaComms.AbstractCommsContext
     mpicomm::MPI.Comm
-    neighbors::Dict{Int, ClimaComms.Neighbor}
-    neighbor_pids::Tuple{Vararg{Int}} # we could just use keys(neighbors), but MultiEvents require a Tuple
-    recv_reqs::Vector{MPI.Request}
-    send_reqs::Vector{MPI.Request}
-
-    function MPICommsContext(
-        neighbors::Dict{Int, ClimaComms.Neighbor};
-        mpicomm = MPI.COMM_WORLD,
-    )
-        neighbor_pids = tuple(keys(neighbors)...)
-        nneighbors = length(neighbor_pids)
-        new(
-            mpicomm,
-            neighbors,
-            neighbor_pids,
-            fill(MPI.REQUEST_NULL, nneighbors),
-            fill(MPI.REQUEST_NULL, nneighbors),
-        )
-    end
 end
+MPICommsContext() = MPICommsContext(MPI.COMM_WORLD)
 
-function Neighbor(
-    ::Type{MPICommsContext},
-    pid,
-    AT,
-    FT,
-    send_dims,
-    recv_dims = send_dims,
-)
-    if pid > 0
-        if AT <: Array || singlebuffered(CC)
-            kind = ClimaComms.SingleRelayBuffer
-        else
-            kind = ClimaComms.DoubleRelayBuffer
-        end
-        send_buf = ClimaComms.RelayBuffer{FT}(AT, kind, send_dims...)
-        recv_buf = ClimaComms.RelayBuffer{FT}(AT, kind, recv_dims...)
-        B = ClimaComms.RelayBuffer
-    else
-        send_buf = recv_buf = missing
-        B = Missing
-    end
-    return ClimaComms.Neighbor{B}(send_buf, recv_buf)
-end
-
-function ClimaComms.init(::Type{MPICommsContext})
+function ClimaComms.init(ctx::MPICommsContext)
     if !MPI.Initialized()
         MPI.Init()
     end
 
-    return ClimaComms.mypid(MPICommsContext), ClimaComms.nprocs(MPICommsContext)
+    return ClimaComms.mypid(ctx), ClimaComms.nprocs(ctx)
 end
 
-ClimaComms.mypid(::Type{MPICommsContext}) = MPI.Comm_rank(MPI.COMM_WORLD) + 1
 ClimaComms.mypid(ctx::MPICommsContext) = MPI.Comm_rank(ctx.mpicomm) + 1
-ClimaComms.iamroot(CC::Type{MPICommsContext}) = ClimaComms.mypid(CC) == 1
 ClimaComms.iamroot(ctx::MPICommsContext) = ClimaComms.mypid(ctx) == 1
-ClimaComms.nprocs(::Type{MPICommsContext}) = MPI.Comm_size(MPI.COMM_WORLD)
 ClimaComms.nprocs(ctx::MPICommsContext) = MPI.Comm_size(ctx.mpicomm)
-ClimaComms.singlebuffered(::Type{MPICommsContext}) = MPI.has_cuda()
-ClimaComms.neighbors(ctx::MPICommsContext) = ctx.neighbors
-
-function ClimaComms.start(ctx::MPICommsContext; dependencies = nothing)
-    if !all(r -> r == MPI.REQUEST_NULL, ctx.recv_reqs)
-        error("Must finish() before next start()")
-    end
-
-    progress = () -> iprobe_and_yield(ctx.mpicomm)
-
-    # start moving staged send data to transfer buffers
-    events = map(ctx.neighbor_pids) do pid
-        ClimaComms.prepare_transfer!(
-            ctx.neighbors[pid].send_buf,
-            dependencies = dependencies,
-            progress = progress,
-        )
-    end
-
-    # post receives
-    for (n, pid) in enumerate(ctx.neighbor_pids)
-        tbuf =
-            ClimaComms.get_transfer(ClimaComms.recv_buffer(ctx.neighbors[pid]))
-        ctx.recv_reqs[n] = MPI.Irecv!(tbuf, pid - 1, 666, ctx.mpicomm)
-    end
-
-    # wait for send data to reach the transfer buffers
-    wait(CPU(), MultiEvent(events), progress)
-
-    # post sends
-    for (n, pid) in enumerate(ctx.neighbor_pids)
-        tbuf =
-            ClimaComms.get_transfer(ClimaComms.send_buffer(ctx.neighbors[pid]))
-        ctx.send_reqs[n] = MPI.Isend(tbuf, pid - 1, 666, ctx.mpicomm)
-    end
-end
-
-function ClimaComms.progress(ctx::MPICommsContext)
-    MPI.Iprobe(MPI.MPI_ANY_SOURCE, MPI.MPI_ANY_TAG, ctx.mpicomm)
-end
-
-function ClimaComms.finish(ctx::MPICommsContext; dependencies = nothing)
-    if any(r -> r == MPI.REQUEST_NULL, ctx.recv_reqs)
-        error("Must start() before finish()")
-    end
-
-    progress = () -> iprobe_and_yield(ctx.mpicomm)
-
-    # wait on previous receives
-    MPI.Waitall!(ctx.recv_reqs)
-
-    # move received data to stage buffers
-    events = map(ctx.neighbor_pids) do pid
-        ClimaComms.prepare_stage!(
-            ClimaComms.recv_buffer(ctx.neighbors[pid]);
-            dependencies = dependencies,
-            progress = progress,
-        )
-    end
-
-    # ensure that sends have completed
-    MPI.Waitall!(ctx.send_reqs)
-
-    return MultiEvent(events)
-end
-
-function iprobe_and_yield(mpicomm)
-    MPI.Iprobe(MPI.MPI_ANY_SOURCE, MPI.MPI_ANY_TAG, mpicomm)
-    yield()
-end
 
 ClimaComms.barrier(ctx::MPICommsContext) = MPI.Barrier(ctx.mpicomm)
 
@@ -158,5 +43,92 @@ end
 
 ClimaComms.abort(ctx::MPICommsContext, status::Int) =
     MPI.Abort(ctx.mpicomm, status)
+
+
+# We could probably do something fancier here?
+# Would need to be careful as there is no guarantee that all ranks will call
+# finalizers at the same time.
+const TAG = Ref(Cint(0))
+function newtag(ctx::MPICommsContext)
+    TAG[] = tag = mod(TAG[] + 1, MPI.MPI_TAG_UB)
+    if tag == 0
+        @warn("MPICommsMPI: tag overflow")
+    end
+    return tag
+end
+
+"""
+    MPISendRecvGraphContext
+
+A simple ghost buffer implementation using MPI `Isend`/`Irecv` operations.
+"""
+mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
+    ctx::MPICommsContext
+    tag::Cint
+    send_bufs::Vector{MPI.Buffer}
+    send_ranks::Vector{Cint}
+    send_reqs::Vector{MPI.Request}
+    recv_bufs::Vector{MPI.Buffer}
+    recv_ranks::Vector{Cint}
+    recv_reqs::Vector{MPI.Request}
+end
+
+function ClimaComms.graph_context(ctx::MPICommsContext, send_array, send_lengths, send_pids, recv_array, recv_lengths, recv_pids)
+    @assert length(send_pids) == length(send_lengths)
+    @assert length(recv_pids) == length(recv_lengths)
+
+    tag = newtag(ctx)
+
+    send_bufs = MPI.Buffer[]
+    total_len = 0
+    for len in send_lengths
+        buf = MPI.Buffer(view(send_array, total_len+1:total_len+len))
+        push!(send_bufs, buf)
+        total_len += len
+    end
+    send_ranks = Cint[pid - 1 for pid in send_pids]
+    send_reqs = MPI.Request[MPI.REQUEST_NULL for _ in send_ranks]
+
+    recv_bufs = MPI.Buffer[]
+    total_len = 0
+    for len in recv_lengths
+        buf = MPI.Buffer(view(recv_array, total_len+1:total_len+len))
+        push!(recv_bufs, buf)
+        total_len += len
+    end
+    recv_ranks = Cint[pid - 1 for pid in recv_pids]
+    recv_reqs = MPI.Request[MPI.REQUEST_NULL for _ in recv_ranks]
+
+    MPISendRecvGraphContext(ctx, tag, send_bufs, send_ranks, send_reqs, recv_bufs, recv_ranks, recv_reqs)
+end
+
+
+
+function ClimaComms.start(ghost::MPISendRecvGraphContext; dependencies = nothing)
+    if !all(r -> r == MPI.REQUEST_NULL, ghost.recv_reqs)
+        error("Must finish() before next start()")
+    end
+    # post receives
+    for n in 1:length(ghost.recv_bufs)
+        ghost.recv_reqs[n] = MPI.Irecv!(ghost.recv_bufs[n], ghost.recv_ranks[n], ghost.tag, ghost.ctx.mpicomm)
+    end
+    # post sends
+    for n in 1:length(ghost.send_bufs)
+        ghost.send_reqs[n] = MPI.Isend(ghost.send_bufs[n], ghost.send_ranks[n], ghost.tag, ghost.ctx.mpicomm)
+    end
+end
+
+function ClimaComms.progress(ghost::MPISendRecvGraphContext)
+    MPI.Iprobe(MPI.MPI_ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
+end
+
+function ClimaComms.finish(ghost::MPISendRecvGraphContext; dependencies = nothing)
+    # wait on previous receives
+    MPI.Waitall!(ghost.recv_reqs)
+    # ensure that sends have completed
+    # TODO: these could be moved to start()? but we would need to add a finalizer to make sure they complete.
+    MPI.Waitall!(ghost.send_reqs)
+end
+
 
 end # module

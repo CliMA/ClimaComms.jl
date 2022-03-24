@@ -17,7 +17,8 @@ function runmpi(file; ntasks = 1)
         true
     end
 end
-
+#=
 @testset "Stencil" begin
     runmpi(joinpath(@__DIR__, "mpi_stencil.jl"), ntasks = 4)
 end
+=#
