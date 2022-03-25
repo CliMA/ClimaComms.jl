@@ -11,6 +11,7 @@ ClimaComms
 ### Contexts
 ```@docs
 ClimaComms.AbstractCommsContext
+ClimaComms.AbstractGraphContext
 ```
 
 ### Communication interface
@@ -19,22 +20,17 @@ ClimaComms.init
 ClimaComms.mypid
 ClimaComms.iamroot
 ClimaComms.nprocs
-ClimaComms.singlebuffered
-ClimaComms.start
-ClimaComms.progress
-ClimaComms.finish
 ClimaComms.barrier
 ClimaComms.reduce
 ClimaComms.abort
+ClimaComms.graph_context
+ClimaComms.start
+ClimaComms.progress
+ClimaComms.finish
 ```
 
-### Neighbors
-```@docs
-ClimaComms.Neighbor
-```
+### Contexts
 
 ```@docs
-ClimaComms.id
-ClimaComms.send_stage
-ClimaComms.recv_stage
+ClimaComms.SingletonCommsContext
 ```

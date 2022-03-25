@@ -20,8 +20,7 @@ module ClimaComms
     AbstractCommsContext
 
 The base type for a communications context. Each backend defines a
-concrete subtype of this, an instance of which is constructed by passing
-in an array of `Neighbor`s.
+concrete subtype of this.
 """
 abstract type AbstractCommsContext end
 
@@ -90,7 +89,11 @@ Terminate the caller and all participating processors with the specified
 function abort end
 abort(::Nothing, status::Int) = exit(status)
 
+"""
+    AbstractGraphContext
 
+A context for communicating between processes in a graph.
+"""
 abstract type AbstractGraphContext end
 
 """

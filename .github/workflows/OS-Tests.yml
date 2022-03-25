@@ -23,7 +23,7 @@ jobs:
 
     - name: Checkout
       uses: actions/checkout@v2.2.0
-    
+
     # Setup a filter and only run if src/ test/ folder content changes
     # or project depedencies
     - uses: dorny/paths-filter@v2
@@ -56,7 +56,7 @@ jobs:
       env:
         cache-name: cache-artifacts
       with:
-        path: ~/.julia/artifacts 
+        path: ~/.julia/artifacts
         key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
         restore-keys: |
           ${{ runner.os }}-test-${{ env.cache-name }}-
@@ -72,13 +72,14 @@ jobs:
         julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
         julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.precompile(;strict=true)'
         julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.status()'
-        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.precompile(;strict=true)'
-        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status()'
+#        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
+#        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.precompile(;strict=true)'
+#        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status()'
 
     - name: Run MPI Unit Tests
       if: steps.filter.outputs.run_test == 'true'
       run: |
+        julia --color=yes --project -e 'using Pkg; Pkg.test()'
         julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.test()'
 
 # Re-enable this when https://github.com/CliMA/ClimaComms.jl/issues/6 is fixed
