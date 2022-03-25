@@ -73,7 +73,15 @@ mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
     recv_reqs::Vector{MPI.Request}
 end
 
-function ClimaComms.graph_context(ctx::MPICommsContext, send_array, send_lengths, send_pids, recv_array, recv_lengths, recv_pids)
+function ClimaComms.graph_context(
+    ctx::MPICommsContext,
+    send_array,
+    send_lengths,
+    send_pids,
+    recv_array,
+    recv_lengths,
+    recv_pids,
+)
     @assert length(send_pids) == length(send_lengths)
     @assert length(recv_pids) == length(recv_lengths)
 
@@ -82,7 +90,7 @@ function ClimaComms.graph_context(ctx::MPICommsContext, send_array, send_lengths
     send_bufs = MPI.Buffer[]
     total_len = 0
     for len in send_lengths
-        buf = MPI.Buffer(view(send_array, total_len+1:total_len+len))
+        buf = MPI.Buffer(view(send_array, (total_len + 1):(total_len + len)))
         push!(send_bufs, buf)
         total_len += len
     end
@@ -92,29 +100,51 @@ function ClimaComms.graph_context(ctx::MPICommsContext, send_array, send_lengths
     recv_bufs = MPI.Buffer[]
     total_len = 0
     for len in recv_lengths
-        buf = MPI.Buffer(view(recv_array, total_len+1:total_len+len))
+        buf = MPI.Buffer(view(recv_array, (total_len + 1):(total_len + len)))
         push!(recv_bufs, buf)
         total_len += len
     end
     recv_ranks = Cint[pid - 1 for pid in recv_pids]
     recv_reqs = MPI.Request[MPI.REQUEST_NULL for _ in recv_ranks]
 
-    MPISendRecvGraphContext(ctx, tag, send_bufs, send_ranks, send_reqs, recv_bufs, recv_ranks, recv_reqs)
+    MPISendRecvGraphContext(
+        ctx,
+        tag,
+        send_bufs,
+        send_ranks,
+        send_reqs,
+        recv_bufs,
+        recv_ranks,
+        recv_reqs,
+    )
 end
 
 
 
-function ClimaComms.start(ghost::MPISendRecvGraphContext; dependencies = nothing)
+function ClimaComms.start(
+    ghost::MPISendRecvGraphContext;
+    dependencies = nothing,
+)
     if !all(r -> r == MPI.REQUEST_NULL, ghost.recv_reqs)
         error("Must finish() before next start()")
     end
     # post receives
     for n in 1:length(ghost.recv_bufs)
-        ghost.recv_reqs[n] = MPI.Irecv!(ghost.recv_bufs[n], ghost.recv_ranks[n], ghost.tag, ghost.ctx.mpicomm)
+        ghost.recv_reqs[n] = MPI.Irecv!(
+            ghost.recv_bufs[n],
+            ghost.recv_ranks[n],
+            ghost.tag,
+            ghost.ctx.mpicomm,
+        )
     end
     # post sends
     for n in 1:length(ghost.send_bufs)
-        ghost.send_reqs[n] = MPI.Isend(ghost.send_bufs[n], ghost.send_ranks[n], ghost.tag, ghost.ctx.mpicomm)
+        ghost.send_reqs[n] = MPI.Isend(
+            ghost.send_bufs[n],
+            ghost.send_ranks[n],
+            ghost.tag,
+            ghost.ctx.mpicomm,
+        )
     end
 end
 
@@ -122,7 +152,10 @@ function ClimaComms.progress(ghost::MPISendRecvGraphContext)
     MPI.Iprobe(MPI.MPI_ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
 end
 
-function ClimaComms.finish(ghost::MPISendRecvGraphContext; dependencies = nothing)
+function ClimaComms.finish(
+    ghost::MPISendRecvGraphContext;
+    dependencies = nothing,
+)
     # wait on previous receives
     MPI.Waitall!(ghost.recv_reqs)
     # ensure that sends have completed

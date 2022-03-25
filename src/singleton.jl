@@ -1,12 +1,11 @@
 """
     SingletonCommsContext()
 
-A singleton communications context, which is used for single-process runs.
+A singleton communications context, used for single-process runs.
 """
-struct SingletonCommsContext <: AbstractCommsContext
-end
+struct SingletonCommsContext <: AbstractCommsContext end
 
-init(::SingletonCommsContext) = (1,1)
+init(::SingletonCommsContext) = (1, 1)
 
 mypid(::SingletonCommsContext) = 1
 iamroot(::SingletonCommsContext) = true
@@ -19,8 +18,15 @@ struct SingletonGraphContext <: AbstractGraphContext
     context::SingletonCommsContext
 end
 
-function graph_context(ctx::SingletonCommsContext,
-    send_array, send_lengths, send_pids, recv_array, recv_lengths, recv_pids)
+function graph_context(
+    ctx::SingletonCommsContext,
+    send_array,
+    send_lengths,
+    send_pids,
+    recv_array,
+    recv_lengths,
+    recv_pids,
+)
 
     @assert isempty(send_array)
     @assert isempty(send_lengths)

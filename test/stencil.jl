@@ -165,24 +165,32 @@ function stencil_test(
         #---------
         if left_nbr > 0
             push!(pids, left_nbr)
-            push!(lengths, radius*width)
+            push!(lengths, radius * width)
         end
         if right_nbr > 0
             push!(pids, right_nbr)
-            push!(lengths, radius*width)
+            push!(lengths, radius * width)
         end
         if top_nbr > 0
             push!(pids, top_nbr)
-            push!(lengths, height*radius)
+            push!(lengths, height * radius)
         end
         if bottom_nbr > 0
             push!(pids, bottom_nbr)
-            push!(lengths, height*radius)
+            push!(lengths, height * radius)
         end
         all_send_buffer = AT{FT}(undef, sum(lengths))
         all_recv_buffer = AT{FT}(undef, sum(lengths))
 
-        graph_ctx = ClimaComms.graph_context(comms_ctx, all_send_buffer, lengths, pids, all_recv_buffer, lengths, pids)
+        graph_ctx = ClimaComms.graph_context(
+            comms_ctx,
+            all_send_buffer,
+            lengths,
+            pids,
+            all_recv_buffer,
+            lengths,
+            pids,
+        )
         # compute loop
         local_stencil_time = 0
         for iter in 0:niterations
@@ -194,30 +202,32 @@ function stencil_test(
             # fill send buffers
             offset = 0
             if left_nbr > 0
-                n = radius*width
-                send_buffer = @view all_send_buffer[offset+1:offset+n]
-                send_data = @view input[rstart:(rstart + radius - 1), cstart:cend]
+                n = radius * width
+                send_buffer = @view all_send_buffer[(offset + 1):(offset + n)]
+                send_data =
+                    @view input[rstart:(rstart + radius - 1), cstart:cend]
                 copyto!(send_buffer, send_data)
                 offset += n
             end
             if right_nbr > 0
-                n = radius*width
-                send_buffer = @view all_send_buffer[offset+1:offset+n]
+                n = radius * width
+                send_buffer = @view all_send_buffer[(offset + 1):(offset + n)]
                 send_data = @view input[(rend - radius + 1):rend, cstart:cend]
                 copyto!(send_buffer, send_data)
                 offset += n
             end
             if top_nbr > 0
-                n = height*radius
-                send_buffer = @view all_send_buffer[offset+1:offset+n]
+                n = height * radius
+                send_buffer = @view all_send_buffer[(offset + 1):(offset + n)]
                 send_data = @view input[rstart:rend, (cend - radius + 1):cend]
                 copyto!(send_buffer, send_data)
                 offset += n
             end
             if bottom_nbr > 0
-                n = height*radius
-                send_buffer = @view all_send_buffer[offset+1:offset+n]
-                send_data = @view input[rstart:rend, cstart:(cstart + radius - 1)]
+                n = height * radius
+                send_buffer = @view all_send_buffer[(offset + 1):(offset + n)]
+                send_data =
+                    @view input[rstart:rend, cstart:(cstart + radius - 1)]
                 copyto!(send_buffer, send_data)
                 offset += n
             end
@@ -242,30 +252,32 @@ function stencil_test(
 
             offset = 0
             if left_nbr > 0
-                n = radius*width
-                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
-                recv_data = @view input[(rstart - radius):(rstart - 1), cstart:cend]
+                n = radius * width
+                recv_buffer = @view all_recv_buffer[(offset + 1):(offset + n)]
+                recv_data =
+                    @view input[(rstart - radius):(rstart - 1), cstart:cend]
                 copyto!(recv_data, recv_buffer)
                 offset += n
             end
             if right_nbr > 0
-                n = radius*width
-                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
+                n = radius * width
+                recv_buffer = @view all_recv_buffer[(offset + 1):(offset + n)]
                 recv_data = @view input[(rend + 1):(rend + radius), cstart:cend]
                 copyto!(recv_data, recv_buffer)
                 offset += n
             end
             if top_nbr > 0
-                n = radius*width
-                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
+                n = radius * width
+                recv_buffer = @view all_recv_buffer[(offset + 1):(offset + n)]
                 recv_data = @view input[rstart:rend, (cend + 1):(cend + radius)]
                 copyto!(recv_data, recv_buffer)
                 offset += n
             end
             if bottom_nbr > 0
-                n = radius*width
-                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
-                recv_data = @view input[rstart:rend, (cstart - radius):(cstart - 1)]
+                n = radius * width
+                recv_buffer = @view all_recv_buffer[(offset + 1):(offset + n)]
+                recv_data =
+                    @view input[rstart:rend, (cstart - radius):(cstart - 1)]
                 copyto!(recv_data, recv_buffer)
                 offset += n
             end
