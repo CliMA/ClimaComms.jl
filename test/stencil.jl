@@ -23,6 +23,8 @@ const default_float_types = (Float64, Float32)
 #const default_array_types = CUDA.has_cuda() ? (CuArray, Array) : (Array,)
 const default_array_types = (Array,)
 
+puts(s...) = ccall(:puts, Cint, (Cstring,), string(s...))
+
 epsilon(::Type{Float64}) = 1.0e-8
 epsilon(::Type{Float32}) = 0.0001f0
 coefx(::Type{Float64}) = 1.0
@@ -90,22 +92,6 @@ function setup_input(AT, FT, height, cstart, cend, width, rstart, rend, radius)
     )
 end
 
-# fill the send stage buffer for the specified neighbor from `input`
-function fill_send_buf(npid, neighbors, input, rrange, crange)
-    if npid > 0
-        buf = ClimaComms.send_stage(neighbors[npid])
-        buf .= view(input, rrange, crange)
-    end
-end
-
-# copy the receive stage buffer for the specified neighbor into `input`
-function empty_recv_buf(npid, neighbors, input, rrange, crange)
-    if npid > 0
-        buf = ClimaComms.recv_stage(neighbors[npid])
-        view(input, rrange, crange) .= buf
-    end
-end
-
 # apply the stencil operator
 # TODO: ensure this uses FMAs
 function stencil(out, weight, radius, input, r, c)
@@ -123,7 +109,7 @@ function stencil(out, weight, radius, input, r, c)
 end
 
 function stencil_test(
-    Context::Type{<:ClimaComms.AbstractCommsContext};
+    comms_ctx::ClimaComms.AbstractCommsContext;
     array_types = default_array_types,
     float_types = default_float_types,
     n = default_n,
@@ -133,10 +119,10 @@ function stencil_test(
     stencil_size = 4radius + 1
 
     # initialize and get processor info
-    pid, nprocs = ClimaComms.init(Context)
+    pid, nprocs = ClimaComms.init(comms_ctx)
 
     # log output only from pid 0
-    logger_stream = ClimaComms.iamroot(Context) ? stderr : devnull
+    logger_stream = ClimaComms.iamroot(comms_ctx) ? stderr : devnull
     prev_logger = global_logger(ConsoleLogger(logger_stream, Logging.Info))
     atexit() do
         global_logger(prev_logger)
@@ -174,25 +160,29 @@ function stencil_test(
         outa = AT{FT}(undef, height, width)
         fill!(outa, zero(FT))
         out = OffsetArray(outa, rstart:rend, cstart:cend)
+        pids = Int[]
+        lengths = Int[]
         #---------
-        # set up communication buffers for neighbors
-        make_neighbor(pid, send_dims, recv_dims = send_dims) =
-            ClimaComms.Neighbor(Context, pid, AT, FT, send_dims, recv_dims)
-        neighbors = Dict{Int, ClimaComms.Neighbor}()
         if left_nbr > 0
-            neighbors[left_nbr] = make_neighbor(left_nbr, (radius, width))
+            push!(pids, left_nbr)
+            push!(lengths, radius*width)
         end
         if right_nbr > 0
-            neighbors[right_nbr] = make_neighbor(right_nbr, (radius, width))
+            push!(pids, right_nbr)
+            push!(lengths, radius*width)
         end
         if top_nbr > 0
-            neighbors[top_nbr] = make_neighbor(top_nbr, (height, radius))
+            push!(pids, top_nbr)
+            push!(lengths, height*radius)
         end
         if bottom_nbr > 0
-            neighbors[bottom_nbr] = make_neighbor(bottom_nbr, (height, radius))
+            push!(pids, bottom_nbr)
+            push!(lengths, height*radius)
         end
+        all_send_buffer = AT{FT}(undef, sum(lengths))
+        all_recv_buffer = AT{FT}(undef, sum(lengths))
 
-        comms_ctx = Context(neighbors)
+        graph_ctx = ClimaComms.graph_context(comms_ctx, all_send_buffer, lengths, pids, all_recv_buffer, lengths, pids)
         # compute loop
         local_stencil_time = 0
         for iter in 0:niterations
@@ -201,39 +191,39 @@ function stencil_test(
                 ClimaComms.barrier(comms_ctx)
                 local_stencil_time = time()
             end
-            neighbors = comms_ctx.neighbors
             # fill send buffers
-            fill_send_buf(
-                left_nbr,
-                neighbors,
-                input,
-                rstart:(rstart + radius - 1),
-                cstart:cend,
-            )
-            fill_send_buf(
-                right_nbr,
-                neighbors,
-                input,
-                (rend - radius + 1):rend,
-                cstart:cend,
-            )
-            fill_send_buf(
-                top_nbr,
-                neighbors,
-                input,
-                rstart:rend,
-                (cend - radius + 1):cend,
-            )
-            fill_send_buf(
-                bottom_nbr,
-                neighbors,
-                input,
-                rstart:rend,
-                cstart:(cstart + radius - 1),
-            )
+            offset = 0
+            if left_nbr > 0
+                n = radius*width
+                send_buffer = @view all_send_buffer[offset+1:offset+n]
+                send_data = @view input[rstart:(rstart + radius - 1), cstart:cend]
+                copyto!(send_buffer, send_data)
+                offset += n
+            end
+            if right_nbr > 0
+                n = radius*width
+                send_buffer = @view all_send_buffer[offset+1:offset+n]
+                send_data = @view input[(rend - radius + 1):rend, cstart:cend]
+                copyto!(send_buffer, send_data)
+                offset += n
+            end
+            if top_nbr > 0
+                n = height*radius
+                send_buffer = @view all_send_buffer[offset+1:offset+n]
+                send_data = @view input[rstart:rend, (cend - radius + 1):cend]
+                copyto!(send_buffer, send_data)
+                offset += n
+            end
+            if bottom_nbr > 0
+                n = height*radius
+                send_buffer = @view all_send_buffer[offset+1:offset+n]
+                send_data = @view input[rstart:rend, cstart:(cstart + radius - 1)]
+                copyto!(send_buffer, send_data)
+                offset += n
+            end
 
             # initiate communication
-            ClimaComms.start(comms_ctx)
+            ClimaComms.start(graph_ctx)
 
             # apply the stencil operator to the interior while waiting
             # for communication
@@ -241,41 +231,44 @@ function stencil_test(
                 for r in (rstart + radius):(rend - radius)
                     stencil(out, weight, radius, input, r, c)
                 end
-                ClimaComms.progress(comms_ctx)
+                ClimaComms.progress(graph_ctx)
             end
 
             # complete communication
-            ClimaComms.finish(comms_ctx)
+            ClimaComms.finish(graph_ctx)
 
             # move receive buffers to the input array
-            empty_recv_buf(
-                left_nbr,
-                neighbors,
-                input,
-                (rstart - radius):(rstart - 1),
-                cstart:cend,
-            )
-            empty_recv_buf(
-                right_nbr,
-                neighbors,
-                input,
-                (rend + 1):(rend + radius),
-                cstart:cend,
-            )
-            empty_recv_buf(
-                top_nbr,
-                neighbors,
-                input,
-                rstart:rend,
-                (cend + 1):(cend + radius),
-            )
-            empty_recv_buf(
-                bottom_nbr,
-                neighbors,
-                input,
-                rstart:rend,
-                (cstart - radius):(cstart - 1),
-            )
+            # copy the receive stage buffer for the specified neighbor into `input`
+
+            offset = 0
+            if left_nbr > 0
+                n = radius*width
+                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
+                recv_data = @view input[(rstart - radius):(rstart - 1), cstart:cend]
+                copyto!(recv_data, recv_buffer)
+                offset += n
+            end
+            if right_nbr > 0
+                n = radius*width
+                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
+                recv_data = @view input[(rend + 1):(rend + radius), cstart:cend]
+                copyto!(recv_data, recv_buffer)
+                offset += n
+            end
+            if top_nbr > 0
+                n = radius*width
+                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
+                recv_data = @view input[rstart:rend, (cend + 1):(cend + radius)]
+                copyto!(recv_data, recv_buffer)
+                offset += n
+            end
+            if bottom_nbr > 0
+                n = radius*width
+                recv_buffer = @view all_recv_buffer[offset+1:offset+n]
+                recv_data = @view input[rstart:rend, (cstart - radius):(cstart - 1)]
+                copyto!(recv_data, recv_buffer)
+                offset += n
+            end
 
             # now we can apply the stencil operator to the exterior
             @inbounds for c in
@@ -316,7 +309,7 @@ function stencil_test(
         norm = ClimaComms.reduce(comms_ctx, local_norm, +)
 
         # verify correctness
-        if ClimaComms.iamroot(Context)
+        if ClimaComms.iamroot(comms_ctx)
             norm /= active_points
             refnorm = (niterations + 1) * (coefx(FT) + coefy(FT))
             if abs(norm - refnorm) > epsilon(FT)
