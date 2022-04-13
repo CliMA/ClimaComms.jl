@@ -1,7 +1,6 @@
 module ClimaCommsMPI
 
 using ClimaComms
-import ClimaComms.Neighbor
 
 using KernelAbstractions
 using MPI
