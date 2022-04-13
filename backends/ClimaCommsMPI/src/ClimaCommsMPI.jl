@@ -50,7 +50,7 @@ ClimaComms.abort(ctx::MPICommsContext, status::Int) =
 # finalizers at the same time.
 const TAG = Ref(Cint(0))
 function newtag(ctx::MPICommsContext)
-    TAG[] = tag = mod(TAG[] + 1, MPI.MPI_TAG_UB)
+    TAG[] = tag = mod(TAG[] + 1, 32767) # TODO: this should query MPI_TAG_UB attribute (https://github.com/JuliaParallel/MPI.jl/pull/551)
     if tag == 0
         @warn("MPICommsMPI: tag overflow")
     end
