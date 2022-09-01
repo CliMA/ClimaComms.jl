@@ -43,7 +43,6 @@ end
 ClimaComms.abort(ctx::MPICommsContext, status::Int) =
     MPI.Abort(ctx.mpicomm, status)
 
-
 # We could probably do something fancier here?
 # Would need to be careful as there is no guarantee that all ranks will call
 # finalizers at the same time.
@@ -66,10 +65,9 @@ mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
     tag::Cint
     send_bufs::Vector{MPI.Buffer}
     send_ranks::Vector{Cint}
-    send_reqs::Vector{MPI.Request}
     recv_bufs::Vector{MPI.Buffer}
     recv_ranks::Vector{Cint}
-    recv_reqs::Vector{MPI.Request}
+    reqs::Vector{MPI.Request}
 end
 
 function ClimaComms.graph_context(
@@ -94,7 +92,6 @@ function ClimaComms.graph_context(
         total_len += len
     end
     send_ranks = Cint[pid - 1 for pid in send_pids]
-    send_reqs = MPI.Request[MPI.REQUEST_NULL for _ in send_ranks]
 
     recv_bufs = MPI.Buffer[]
     total_len = 0
@@ -104,41 +101,37 @@ function ClimaComms.graph_context(
         total_len += len
     end
     recv_ranks = Cint[pid - 1 for pid in recv_pids]
-    recv_reqs = MPI.Request[MPI.REQUEST_NULL for _ in recv_ranks]
+    nreqs = length(recv_ranks) + length(send_ranks)
+    reqs = MPI.Request[MPI.REQUEST_NULL for _ in 1:nreqs]
 
     MPISendRecvGraphContext(
         ctx,
         tag,
         send_bufs,
         send_ranks,
-        send_reqs,
         recv_bufs,
         recv_ranks,
-        recv_reqs,
+        reqs,
     )
 end
-
-
 
 function ClimaComms.start(
     ghost::MPISendRecvGraphContext;
     dependencies = nothing,
 )
-    if !all(r -> r == MPI.REQUEST_NULL, ghost.recv_reqs)
-        error("Must finish() before next start()")
-    end
     # post receives
     for n in 1:length(ghost.recv_bufs)
-        ghost.recv_reqs[n] = MPI.Irecv!(
+        ghost.reqs[n] = MPI.Irecv!(
             ghost.recv_bufs[n],
             ghost.recv_ranks[n],
             ghost.tag,
             ghost.ctx.mpicomm,
         )
     end
+    nrecv = length(ghost.recv_bufs)
     # post sends
     for n in 1:length(ghost.send_bufs)
-        ghost.send_reqs[n] = MPI.Isend(
+        ghost.reqs[nrecv + n] = MPI.Isend(
             ghost.send_bufs[n],
             ghost.send_ranks[n],
             ghost.tag,
@@ -147,20 +140,10 @@ function ClimaComms.start(
     end
 end
 
-function ClimaComms.progress(ghost::MPISendRecvGraphContext)
+ClimaComms.progress(ghost::MPISendRecvGraphContext) =
     MPI.Iprobe(MPI.MPI_ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
-end
 
-function ClimaComms.finish(
-    ghost::MPISendRecvGraphContext;
-    dependencies = nothing,
-)
-    # wait on previous receives
-    MPI.Waitall!(ghost.recv_reqs)
-    # ensure that sends have completed
-    # TODO: these could be moved to start()? but we would need to add a finalizer to make sure they complete.
-    MPI.Waitall!(ghost.send_reqs)
-end
-
+ClimaComms.finish(ghost::MPISendRecvGraphContext; dependencies = nothing) =
+    MPI.Waitall!(ghost.reqs) # wait on receives and sends
 
 end # module
