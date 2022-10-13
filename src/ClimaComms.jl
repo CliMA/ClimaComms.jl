@@ -75,9 +75,7 @@ reduce(::Nothing, val, op) = val
 """
     allreduce(ctx::CC, sendbuf, op)
 
-Usage: recvbuf = allreduce(ctx, sendbuf, op)
-
-Performs elementwise reduction using the operator `op` on the buffer `sendbuf`, returning the result in the `recvbuf` of all processes in the group.
+Performs elementwise reduction using the operator `op` on the buffer `sendbuf`, allocating a new array for the result.
 `sendbuf` can also be a scalar, in which case `recvbuf` will be a value of the same type.
 """
 function allreduce end
