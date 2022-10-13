@@ -11,5 +11,5 @@ MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 [compat]
 ClimaComms = "0.3"
 KernelAbstractions = "0.7"
-MPI = "0.19"
+MPI = "0.20"
 julia = "1.7"

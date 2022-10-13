@@ -49,7 +49,8 @@ ClimaComms.abort(ctx::MPICommsContext, status::Int) =
 # finalizers at the same time.
 const TAG = Ref(Cint(0))
 function newtag(ctx::MPICommsContext)
-    TAG[] = tag = mod(TAG[] + 1, 32767) # TODO: this should query MPI_TAG_UB attribute (https://github.com/JuliaParallel/MPI.jl/pull/551)
+    maxtag = tag_ub()
+    TAG[] = tag = mod(TAG[] + 1, maxtag)
     if tag == 0
         @warn("MPICommsMPI: tag overflow")
     end
@@ -66,10 +67,10 @@ mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
     tag::Cint
     send_bufs::Vector{MPI.Buffer}
     send_ranks::Vector{Cint}
-    send_reqs::Vector{MPI.Request}
+    send_reqs::MPI.RequestSet
     recv_bufs::Vector{MPI.Buffer}
     recv_ranks::Vector{Cint}
-    recv_reqs::Vector{MPI.Request}
+    recv_reqs::MPI.RequestSet
 end
 
 function ClimaComms.graph_context(
@@ -94,7 +95,8 @@ function ClimaComms.graph_context(
         total_len += len
     end
     send_ranks = Cint[pid - 1 for pid in send_pids]
-    send_reqs = MPI.Request[MPI.REQUEST_NULL for _ in send_ranks]
+    send_reqs =
+        MPI.RequestSet(MPI.Request[MPI.REQUEST_NULL for _ in send_ranks])
 
     recv_bufs = MPI.Buffer[]
     total_len = 0
@@ -104,7 +106,8 @@ function ClimaComms.graph_context(
         total_len += len
     end
     recv_ranks = Cint[pid - 1 for pid in recv_pids]
-    recv_reqs = MPI.Request[MPI.REQUEST_NULL for _ in recv_ranks]
+    recv_reqs =
+        MPI.RequestSet(MPI.Request[MPI.REQUEST_NULL for _ in recv_ranks])
 
     MPISendRecvGraphContext(
         ctx,
