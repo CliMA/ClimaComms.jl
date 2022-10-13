@@ -350,6 +350,19 @@ function stencil_test(
         else
             @test isnothing(gathered)
         end
+        # test for allreduce!
+        sendrecvbuf = [pid]
+        ClimaComms.allreduce!(comms_ctx, sendrecvbuf, +)
+        @test sendrecvbuf == [div(nprocs * (nprocs + 1), 2)]
+
+        sendbuf = [pid]
+        recvbuf = [0]
+        ClimaComms.allreduce!(comms_ctx, sendbuf, recvbuf, +)
+        @test recvbuf == [div(nprocs * (nprocs + 1), 2)]
+        # test for allreduce
+        sendbuf = pid
+        recvbuf = ClimaComms.allreduce(comms_ctx, sendbuf, +)
+        @test recvbuf == div(nprocs * (nprocs + 1), 2)
     end
 
     return nothing

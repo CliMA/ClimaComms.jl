@@ -13,7 +13,14 @@ nprocs(::SingletonCommsContext) = 1
 barrier(::SingletonCommsContext) = nothing
 reduce(::SingletonCommsContext, val, op) = val
 gather(::SingletonCommsContext, array) = array
-
+allreduce(::SingletonCommsContext, sendbuf, op) = sendbuf
+function allreduce!(::SingletonCommsContext, sendbuf, recvbuf, op)
+    copyto!(recvbuf, sendbuf)
+    return nothing
+end
+function allreduce!(::SingletonCommsContext, sendrecvbuf, op)
+    return nothing
+end
 struct SingletonGraphContext <: AbstractGraphContext
     context::SingletonCommsContext
 end
