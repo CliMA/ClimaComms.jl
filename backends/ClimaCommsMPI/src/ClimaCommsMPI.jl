@@ -27,6 +27,15 @@ ClimaComms.barrier(ctx::MPICommsContext) = MPI.Barrier(ctx.mpicomm)
 ClimaComms.reduce(ctx::MPICommsContext, val, op) =
     MPI.Reduce(val, op, 0, ctx.mpicomm)
 
+ClimaComms.allreduce(ctx::MPICommsContext, sendbuf, op) =
+    MPI.Allreduce(sendbuf, op, ctx.mpicomm)
+
+ClimaComms.allreduce!(ctx::MPICommsContext, sendbuf, recvbuf, op) =
+    MPI.Allreduce!(sendbuf, recvbuf, op, ctx.mpicomm)
+
+ClimaComms.allreduce!(ctx::MPICommsContext, sendrecvbuf, op) =
+    MPI.Allreduce!(sendrecvbuf, op, ctx.mpicomm)
+
 function ClimaComms.gather(ctx::MPICommsContext, array)
     dims = size(array)
     lengths = MPI.Gather(dims[end], 0, ctx.mpicomm)

@@ -73,6 +73,27 @@ function reduce end
 reduce(::Nothing, val, op) = val
 
 """
+    allreduce(ctx::CC, sendbuf, op)
+
+Usage: recvbuf = allreduce(ctx, sendbuf, op)
+
+Performs elementwise reduction using the operator `op` on the buffer `sendbuf`, returning the result in the `recvbuf` of all processes in the group.
+`sendbuf` can also be a scalar, in which case `recvbuf` will be a value of the same type.
+"""
+function allreduce end
+
+"""
+    allreduce!(ctx::CC, sendbuf, recvbuf, op)
+    allreduce!(ctx::CC, sendrecvbuf, op)
+
+Performs elementwise reduction using the operator `op` on the buffer `sendbuf`, storing the result in the `recvbuf` of all processes in the group.
+`Allreduce!` is equivalent to a `Reduce!` operation followed by a `Bcast!`, but can lead to better performance.
+If only one `sendrecvbuf` buffer is provided, then the operation is performed in-place.
+
+"""
+function allreduce! end
+
+"""
     gather(ctx::AbstractCommsContext, array)
 
 Gather an array of values from all processors into a single array,
