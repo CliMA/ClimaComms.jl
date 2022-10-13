@@ -350,9 +350,9 @@ function stencil_test(
         else
             @test isnothing(gathered)
         end
-        sendrecvbuf = pid
+        sendrecvbuf = [pid]
         ClimaComms.allreduce!(comms_ctx, sendrecvbuf, +)
-        @test sendrecvbuf == div(nprocs * (nprocs + 1), 2)
+        @test sendrecvbuf == [div(nprocs * (nprocs + 1), 2)]
     end
 
     return nothing

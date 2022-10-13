@@ -81,7 +81,6 @@ Performs elementwise reduction using the operator `op` on the buffer `sendbuf`, 
 `sendbuf` can also be a scalar, in which case `recvbuf` will be a value of the same type.
 """
 function allreduce end
-allreduce(::Nothing, sendbuf, op) = sendbuf
 
 """
     allreduce!(ctx::CC, sendbuf, recvbuf, op)
@@ -93,13 +92,6 @@ If only one `sendrecvbuf` buffer is provided, then the operation is performed in
 
 """
 function allreduce! end
-function allreduce!(::Nothing, sendbuf, recvbuf, op)
-    recvbuf = deepcopy(sendbuf)
-    return nothing
-end
-function allreduce!(::Nothing, sendrecvbuf, op)
-    return nothing
-end
 
 """
     gather(ctx::AbstractCommsContext, array)
