@@ -1,8 +1,6 @@
 module ClimaCommsMPI
 
 using ClimaComms
-
-using KernelAbstractions
 using MPI
 
 struct MPICommsContext <: ClimaComms.AbstractCommsContext
