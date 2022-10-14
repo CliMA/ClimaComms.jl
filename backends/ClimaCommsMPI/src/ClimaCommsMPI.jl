@@ -157,7 +157,11 @@ function ClimaComms.start(
 end
 
 function ClimaComms.progress(ghost::MPISendRecvGraphContext)
-    MPI.Iprobe(MPI.MPI_ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
+    if isdefined(MPI, :MPI_ANY_SOURCE) # < v0.20
+        MPI.Iprobe(MPI.MPI_ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
+    else # >= v0.20
+        MPI.Iprobe(MPI.ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
+    end
 end
 
 function ClimaComms.finish(
