@@ -4,7 +4,6 @@ using ClimaComms
 import ClimaComms: Neighbor
 
 using Distributed
-using KernelAbstractions
 using SharedArrays
 
 const ctx_chnl = Ref(RemoteChannel())
