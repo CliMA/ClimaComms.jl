@@ -82,7 +82,7 @@ end
 """
     MPIPSendRecvGraphContext
 
-A simple ghost buffer implementation using MPI persistent `Isend`/`Irecv` operations.
+A simple ghost buffer implementation using MPI persistent send/receive operations.
 """
 struct MPIPSendRecvGraphContext <: ClimaComms.AbstractGraphContext
     ctx::MPICommsContext
