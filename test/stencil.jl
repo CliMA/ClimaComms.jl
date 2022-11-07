@@ -115,6 +115,7 @@ function stencil_test(
     n = default_n,
     radius = default_radius,
     niterations = default_niterations,
+    persistent = false,
 )
     stencil_size = 4radius + 1
 
@@ -190,6 +191,7 @@ function stencil_test(
             all_recv_buffer,
             lengths,
             pids,
+            persistent,
         )
         # compute loop
         local_stencil_time = 0

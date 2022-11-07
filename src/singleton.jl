@@ -33,6 +33,7 @@ function graph_context(
     recv_array,
     recv_lengths,
     recv_pids,
+    persistent = false,
 )
 
     @assert isempty(send_array)
