@@ -80,11 +80,11 @@ mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
 end
 
 """
-    MPIPSendRecvGraphContext
+    MPIPersistentSendRecvGraphContext
 
 A simple ghost buffer implementation using MPI persistent send/receive operations.
 """
-struct MPIPSendRecvGraphContext <: ClimaComms.AbstractGraphContext
+struct MPIPersistentSendRecvGraphContext <: ClimaComms.AbstractGraphContext
     ctx::MPICommsContext
     tag::Cint
     send_bufs::Vector{MPI.Buffer}
@@ -158,7 +158,7 @@ function ClimaComms.graph_context(
                 tag = tag,
             )
         end
-        MPIPSendRecvGraphContext(args...)
+        MPIPersistentSendRecvGraphContext(args...)
     else
         MPISendRecvGraphContext(args...)
     end
@@ -192,7 +192,7 @@ function ClimaComms.start(
 end
 
 function ClimaComms.start(
-    ghost::MPIPSendRecvGraphContext;
+    ghost::MPIPersistentSendRecvGraphContext;
     dependencies = nothing,
 )
     MPI.Startall(ghost.recv_reqs) # post receives
@@ -200,7 +200,7 @@ function ClimaComms.start(
 end
 
 function ClimaComms.progress(
-    ghost::Union{MPISendRecvGraphContext, MPIPSendRecvGraphContext},
+    ghost::Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext},
 )
     if isdefined(MPI, :MPI_ANY_SOURCE) # < v0.20
         MPI.Iprobe(MPI.MPI_ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
@@ -210,7 +210,7 @@ function ClimaComms.progress(
 end
 
 function ClimaComms.finish(
-    ghost::Union{MPISendRecvGraphContext, MPIPSendRecvGraphContext};
+    ghost::Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext};
     dependencies = nothing,
 )
     # wait on previous receives
