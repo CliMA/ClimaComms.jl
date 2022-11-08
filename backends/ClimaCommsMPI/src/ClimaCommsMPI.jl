@@ -103,8 +103,10 @@ function ClimaComms.graph_context(
     recv_array,
     recv_lengths,
     recv_pids,
-    persistent = false,
-)
+    ::Type{GCT} = MPISendRecvGraphContext,
+) where {
+    GCT <: Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext},
+}
     @assert length(send_pids) == length(send_lengths)
     @assert length(recv_pids) == length(recv_lengths)
 
@@ -139,7 +141,7 @@ function ClimaComms.graph_context(
         recv_ranks,
         recv_reqs,
     )
-    if persistent
+    if GCT == MPIPersistentSendRecvGraphContext
         # Allocate a persistent receive request
         for n in 1:length(recv_bufs)
             recv_reqs[n] = MPI.Recv_init(
