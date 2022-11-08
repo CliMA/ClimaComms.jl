@@ -56,7 +56,7 @@ ClimaComms.abort(ctx::MPICommsContext, status::Int) =
 # finalizers at the same time.
 const TAG = Ref(Cint(0))
 function newtag(ctx::MPICommsContext)
-    maxtag = tag_ub()
+    maxtag = MPI.tag_ub()
     TAG[] = tag = mod(TAG[] + 1, maxtag)
     if tag == 0
         @warn("MPICommsMPI: tag overflow")
