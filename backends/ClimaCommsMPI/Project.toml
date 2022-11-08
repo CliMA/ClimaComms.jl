@@ -1,7 +1,7 @@
 name = "ClimaCommsMPI"
 uuid = "5f86816e-8b66-43b2-912e-75384f99de49"
 authors = ["CliMA Contributors <clima-software@caltech.edu>"]
-version = "0.3.4"
+version = "0.3.5"
 
 [deps]
 ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
@@ -9,5 +9,5 @@ MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 
 [compat]
 ClimaComms = "0.3.1"
-MPI = "0.20"
+MPI = "0.20.3"
 julia = "1.7"
