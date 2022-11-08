@@ -22,6 +22,8 @@ ClimaComms.iamroot
 ClimaComms.nprocs
 ClimaComms.barrier
 ClimaComms.reduce
+ClimaComms.allreduce
+ClimaComms.allreduce!
 ClimaComms.abort
 ClimaComms.graph_context
 ClimaComms.start

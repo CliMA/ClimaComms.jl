@@ -13,29 +13,20 @@ nprocs(::SingletonCommsContext) = 1
 barrier(::SingletonCommsContext) = nothing
 reduce(::SingletonCommsContext, val, op) = val
 gather(::SingletonCommsContext, array) = array
-
+allreduce(::SingletonCommsContext, sendbuf, op) = sendbuf
+function allreduce!(::SingletonCommsContext, sendbuf, recvbuf, op)
+    copyto!(recvbuf, sendbuf)
+    return nothing
+end
+function allreduce!(::SingletonCommsContext, sendrecvbuf, op)
+    return nothing
+end
 struct SingletonGraphContext <: AbstractGraphContext
     context::SingletonCommsContext
 end
 
-function graph_context(
-    ctx::SingletonCommsContext,
-    send_array,
-    send_lengths,
-    send_pids,
-    recv_array,
-    recv_lengths,
-    recv_pids,
-)
-
-    @assert isempty(send_array)
-    @assert isempty(send_lengths)
-    @assert isempty(send_pids)
-    @assert isempty(recv_array)
-    @assert isempty(recv_lengths)
-    @assert isempty(recv_pids)
-    return SingletonGraphContext(ctx)
-end
+graph_context(ctx::SingletonCommsContext, kwargs...) =
+    SingletonGraphContext(ctx)
 
 start(gctx::SingletonGraphContext) = nothing
 progress(gctx::SingletonGraphContext) = nothing

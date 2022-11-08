@@ -115,6 +115,7 @@ function stencil_test(
     n = default_n,
     radius = default_radius,
     niterations = default_niterations,
+    persistent = false,
 )
     stencil_size = 4radius + 1
 
@@ -182,15 +183,23 @@ function stencil_test(
         all_send_buffer = AT{FT}(undef, sum(lengths))
         all_recv_buffer = AT{FT}(undef, sum(lengths))
 
-        graph_ctx = ClimaComms.graph_context(
-            comms_ctx,
-            all_send_buffer,
-            lengths,
-            pids,
-            all_recv_buffer,
-            lengths,
-            pids,
-        )
+        if comms_ctx isa ClimaComms.SingletonCommsContext
+            graph_ctx = ClimaComms.graph_context(comms_ctx)
+        else
+            GCT =
+                persistent ? ClimaCommsMPI.MPIPersistentSendRecvGraphContext :
+                ClimaCommsMPI.MPISendRecvGraphContext
+            graph_ctx = ClimaComms.graph_context(
+                comms_ctx,
+                all_send_buffer,
+                lengths,
+                pids,
+                all_recv_buffer,
+                lengths,
+                pids,
+                GCT,
+            )
+        end
         # compute loop
         local_stencil_time = 0
         for iter in 0:niterations
@@ -350,6 +359,19 @@ function stencil_test(
         else
             @test isnothing(gathered)
         end
+        # test for allreduce!
+        sendrecvbuf = [pid]
+        ClimaComms.allreduce!(comms_ctx, sendrecvbuf, +)
+        @test sendrecvbuf == [div(nprocs * (nprocs + 1), 2)]
+
+        sendbuf = [pid]
+        recvbuf = [0]
+        ClimaComms.allreduce!(comms_ctx, sendbuf, recvbuf, +)
+        @test recvbuf == [div(nprocs * (nprocs + 1), 2)]
+        # test for allreduce
+        sendbuf = pid
+        recvbuf = ClimaComms.allreduce(comms_ctx, sendbuf, +)
+        @test recvbuf == div(nprocs * (nprocs + 1), 2)
     end
 
     return nothing
