@@ -195,14 +195,8 @@ function ClimaComms.start(
     ghost::MPIPSendRecvGraphContext;
     dependencies = nothing,
 )
-    # post receives
-    for n in 1:length(ghost.recv_bufs)
-        MPI.Start(ghost.recv_reqs[n])
-    end
-    # post sends
-    for n in 1:length(ghost.send_bufs)
-        MPI.Start(ghost.send_reqs[n])
-    end
+    MPI.Startall(ghost.recv_reqs) # post receives
+    MPI.Startall(ghost.send_reqs) # post sends
 end
 
 function ClimaComms.progress(
