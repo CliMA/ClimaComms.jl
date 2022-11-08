@@ -115,6 +115,7 @@ function stencil_test(
     n = default_n,
     radius = default_radius,
     niterations = default_niterations,
+    persistent = false,
 )
     stencil_size = 4radius + 1
 
@@ -182,15 +183,23 @@ function stencil_test(
         all_send_buffer = AT{FT}(undef, sum(lengths))
         all_recv_buffer = AT{FT}(undef, sum(lengths))
 
-        graph_ctx = ClimaComms.graph_context(
-            comms_ctx,
-            all_send_buffer,
-            lengths,
-            pids,
-            all_recv_buffer,
-            lengths,
-            pids,
-        )
+        if comms_ctx isa ClimaComms.SingletonCommsContext
+            graph_ctx = ClimaComms.graph_context(comms_ctx)
+        else
+            GCT =
+                persistent ? ClimaCommsMPI.MPIPersistentSendRecvGraphContext :
+                ClimaCommsMPI.MPISendRecvGraphContext
+            graph_ctx = ClimaComms.graph_context(
+                comms_ctx,
+                all_send_buffer,
+                lengths,
+                pids,
+                all_recv_buffer,
+                lengths,
+                pids,
+                GCT,
+            )
+        end
         # compute loop
         local_stencil_time = 0
         for iter in 0:niterations

@@ -79,6 +79,22 @@ mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
     recv_reqs::Vector{MPI.Request}
 end
 
+"""
+    MPIPersistentSendRecvGraphContext
+
+A simple ghost buffer implementation using MPI persistent send/receive operations.
+"""
+struct MPIPersistentSendRecvGraphContext <: ClimaComms.AbstractGraphContext
+    ctx::MPICommsContext
+    tag::Cint
+    send_bufs::Vector{MPI.Buffer}
+    send_ranks::Vector{Cint}
+    send_reqs::Vector{MPI.Request}
+    recv_bufs::Vector{MPI.Buffer}
+    recv_ranks::Vector{Cint}
+    recv_reqs::Vector{MPI.Request}
+end
+
 function ClimaComms.graph_context(
     ctx::MPICommsContext,
     send_array,
@@ -87,7 +103,10 @@ function ClimaComms.graph_context(
     recv_array,
     recv_lengths,
     recv_pids,
-)
+    ::Type{GCT} = MPISendRecvGraphContext,
+) where {
+    GCT <: Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext},
+}
     @assert length(send_pids) == length(send_lengths)
     @assert length(recv_pids) == length(recv_lengths)
 
@@ -112,8 +131,7 @@ function ClimaComms.graph_context(
     end
     recv_ranks = Cint[pid - 1 for pid in recv_pids]
     recv_reqs = MPI.Request[MPI.REQUEST_NULL for _ in recv_ranks]
-
-    MPISendRecvGraphContext(
+    args = (
         ctx,
         tag,
         send_bufs,
@@ -123,9 +141,30 @@ function ClimaComms.graph_context(
         recv_ranks,
         recv_reqs,
     )
+    if GCT == MPIPersistentSendRecvGraphContext
+        # Allocate a persistent receive request
+        for n in 1:length(recv_bufs)
+            recv_reqs[n] = MPI.Recv_init(
+                recv_bufs[n],
+                ctx.mpicomm,
+                source = recv_ranks[n],
+                tag = tag,
+            )
+        end
+        # Allocate a persistent send request
+        for n in 1:length(send_bufs)
+            send_reqs[n] = MPI.Send_init(
+                send_bufs[n],
+                ctx.mpicomm,
+                dest = send_ranks[n],
+                tag = tag,
+            )
+        end
+        MPIPersistentSendRecvGraphContext(args...)
+    else
+        MPISendRecvGraphContext(args...)
+    end
 end
-
-
 
 function ClimaComms.start(
     ghost::MPISendRecvGraphContext;
@@ -154,7 +193,17 @@ function ClimaComms.start(
     end
 end
 
-function ClimaComms.progress(ghost::MPISendRecvGraphContext)
+function ClimaComms.start(
+    ghost::MPIPersistentSendRecvGraphContext;
+    dependencies = nothing,
+)
+    MPI.Startall(ghost.recv_reqs) # post receives
+    MPI.Startall(ghost.send_reqs) # post sends
+end
+
+function ClimaComms.progress(
+    ghost::Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext},
+)
     if isdefined(MPI, :MPI_ANY_SOURCE) # < v0.20
         MPI.Iprobe(MPI.MPI_ANY_SOURCE, ghost.tag, ghost.ctx.mpicomm)
     else # >= v0.20
@@ -163,7 +212,7 @@ function ClimaComms.progress(ghost::MPISendRecvGraphContext)
 end
 
 function ClimaComms.finish(
-    ghost::MPISendRecvGraphContext;
+    ghost::Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext};
     dependencies = nothing,
 )
     # wait on previous receives
@@ -172,6 +221,5 @@ function ClimaComms.finish(
     # TODO: these could be moved to start()? but we would need to add a finalizer to make sure they complete.
     MPI.Waitall!(ghost.send_reqs)
 end
-
 
 end # module
