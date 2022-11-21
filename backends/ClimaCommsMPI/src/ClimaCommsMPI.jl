@@ -103,7 +103,7 @@ function ClimaComms.graph_context(
     recv_array,
     recv_lengths,
     recv_pids,
-    ::Type{GCT} = MPISendRecvGraphContext,
+    ::Type{GCT},
 ) where {
     GCT <: Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext},
 }
@@ -165,6 +165,26 @@ function ClimaComms.graph_context(
         MPISendRecvGraphContext(args...)
     end
 end
+
+ClimaComms.graph_context(
+    ctx::MPICommsContext,
+    send_array,
+    send_lengths,
+    send_pids,
+    recv_array,
+    recv_lengths,
+    recv_pids;
+    persistent::Bool = true,
+) = ClimaComms.graph_context(
+    ctx,
+    send_array,
+    send_lengths,
+    send_pids,
+    recv_array,
+    recv_lengths,
+    recv_pids,
+    persistent ? MPIPersistentSendRecvGraphContext : MPISendRecvGraphContext,
+)
 
 function ClimaComms.start(
     ghost::MPISendRecvGraphContext;
