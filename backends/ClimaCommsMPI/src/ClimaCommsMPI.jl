@@ -73,10 +73,10 @@ mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
     tag::Cint
     send_bufs::Vector{MPI.Buffer}
     send_ranks::Vector{Cint}
-    send_reqs::MPI.MultiRequest
+    send_reqs::MPI.UnsafeMultiRequest
     recv_bufs::Vector{MPI.Buffer}
     recv_ranks::Vector{Cint}
-    recv_reqs::MPI.MultiRequest
+    recv_reqs::MPI.UnsafeMultiRequest
 end
 
 """
@@ -89,10 +89,10 @@ struct MPIPersistentSendRecvGraphContext <: ClimaComms.AbstractGraphContext
     tag::Cint
     send_bufs::Vector{MPI.Buffer}
     send_ranks::Vector{Cint}
-    send_reqs::MPI.MultiRequest
+    send_reqs::MPI.UnsafeMultiRequest
     recv_bufs::Vector{MPI.Buffer}
     recv_ranks::Vector{Cint}
-    recv_reqs::MPI.MultiRequest
+    recv_reqs::MPI.UnsafeMultiRequest
 end
 
 function ClimaComms.graph_context(
@@ -120,7 +120,7 @@ function ClimaComms.graph_context(
         total_len += len
     end
     send_ranks = Cint[pid - 1 for pid in send_pids]
-    send_reqs = MPI.MultiRequest(length(send_ranks))
+    send_reqs = MPI.UnsafeMultiRequest(length(send_ranks))
 
     recv_bufs = MPI.Buffer[]
     total_len = 0
@@ -130,7 +130,7 @@ function ClimaComms.graph_context(
         total_len += len
     end
     recv_ranks = Cint[pid - 1 for pid in recv_pids]
-    recv_reqs = MPI.MultiRequest(length(recv_ranks))
+    recv_reqs = MPI.UnsafeMultiRequest(length(recv_ranks))
     args = (
         ctx,
         tag,
