@@ -17,6 +17,27 @@ Use one of the `ClimaComms` backends, currently:
 module ClimaComms
 
 """
+    AbstractDevice
+
+The base type for a device.
+"""
+abstract type AbstractDevice end
+
+"""
+    CPU()
+
+Run code on a CPU device
+"""
+struct CPU <: AbstractDevice end
+
+"""
+    CUDA()
+
+Use NVIDIA GPU accelarator
+"""
+struct CUDA <: AbstractDevice end
+
+"""
     AbstractCommsContext
 
 The base type for a communications context. Each backend defines a
