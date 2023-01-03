@@ -1,9 +1,13 @@
 """
-    SingletonCommsContext()
+    SingletonCommsContext(device = CPU())
 
 A singleton communications context, used for single-process runs.
 """
-struct SingletonCommsContext <: AbstractCommsContext end
+struct SingletonCommsContext <: AbstractCommsContext
+    device::AbstractDevice
+end
+
+SingletonCommsContext(device = CPU()) = SingletonCommsContext(device)
 
 init(::SingletonCommsContext) = (1, 1)
 

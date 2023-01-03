@@ -14,6 +14,13 @@ ClimaComms.AbstractCommsContext
 ClimaComms.AbstractGraphContext
 ```
 
+### Devices
+```@docs
+ClimaComms.AbstractDevice
+ClimaComms.CPU
+ClimaComms.CUDA
+```
+
 ### Communication interface
 ```@docs
 ClimaComms.init

@@ -3,10 +3,17 @@ module ClimaCommsMPI
 using ClimaComms
 using MPI
 
+"""
+    MPICommsContext(device = ClimaComms.CPU())
+
+A MPI communications context, used for distributed runs.
+"""
 struct MPICommsContext <: ClimaComms.AbstractCommsContext
+    device::ClimaComms.AbstractDevice
     mpicomm::MPI.Comm
 end
-MPICommsContext() = MPICommsContext(MPI.COMM_WORLD)
+MPICommsContext(device = ClimaComms.CPU()) =
+    MPICommsContext(device, MPI.COMM_WORLD)
 
 function ClimaComms.init(ctx::MPICommsContext)
     if !MPI.Initialized()
