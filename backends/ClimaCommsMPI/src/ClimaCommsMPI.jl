@@ -7,6 +7,7 @@ using MPI
     MPICommsContext(device = ClimaComms.CPU())
 
 A MPI communications context, used for distributed runs.
+[`ClimaComms.CPU`](@ref) and [`ClimaComms.CUDA`](@ref) device options are currently supported.
 """
 struct MPICommsContext <: ClimaComms.AbstractCommsContext
     device::ClimaComms.AbstractDevice
