@@ -4,11 +4,11 @@
 A singleton communications context, used for single-process runs.
 [`ClimaComms.CPU`](@ref) and [`ClimaComms.CUDA`](@ref) device options are currently supported.
 """
-struct SingletonCommsContext <: AbstractCommsContext
-    device::AbstractDevice
+struct SingletonCommsContext{T <: AbstractDevice} <: AbstractCommsContext
+    device::T
 end
 
-SingletonCommsContext(device = CPU()) = SingletonCommsContext(device)
+SingletonCommsContext() = SingletonCommsContext(CPU())
 
 init(::SingletonCommsContext) = (1, 1)
 
