@@ -1,11 +1,12 @@
 """
-    SingletonCommsContext(device = CPU())
+    SingletonCommsContext()
+    SingletonCommsContext(device)
 
 A singleton communications context, used for single-process runs.
 [`ClimaComms.CPU`](@ref) and [`ClimaComms.CUDA`](@ref) device options are currently supported.
 """
-struct SingletonCommsContext{T <: AbstractDevice} <: AbstractCommsContext
-    device::T
+struct SingletonCommsContext{D <: AbstractDevice} <: AbstractCommsContext
+    device::D
 end
 
 SingletonCommsContext() = SingletonCommsContext(CPU())

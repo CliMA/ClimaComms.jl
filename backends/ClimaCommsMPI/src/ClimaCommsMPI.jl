@@ -4,17 +4,20 @@ using ClimaComms
 using MPI
 
 """
-    MPICommsContext(device = ClimaComms.CPU())
+    MPICommsContext()
+    MPICommsContext(device)
+    MPICommsContext(device, comm)
 
 A MPI communications context, used for distributed runs.
 [`ClimaComms.CPU`](@ref) and [`ClimaComms.CUDA`](@ref) device options are currently supported.
 """
-struct MPICommsContext <: ClimaComms.AbstractCommsContext
-    device::ClimaComms.AbstractDevice
-    mpicomm::MPI.Comm
+struct MPICommsContext{D <: ClimaComms.AbstractDevice, C <: MPI.Comm} <:
+       ClimaComms.AbstractCommsContext
+    device::D
+    mpicomm::C
 end
-MPICommsContext(device = ClimaComms.CPU()) =
-    MPICommsContext(device, MPI.COMM_WORLD)
+MPICommsContext() = MPICommsContext(ClimaComms.CPU(), MPI.COMM_WORLD)
+MPICommsContext(device) = MPICommsContext(device, MPI.COMM_WORLD)
 
 function ClimaComms.init(ctx::MPICommsContext)
     if !MPI.Initialized()
