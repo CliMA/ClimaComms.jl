@@ -1,6 +1,5 @@
 """
-    SingletonCommsContext()
-    SingletonCommsContext(device)
+    SingletonCommsContext(device=device())
 
 A singleton communications context, used for single-process runs.
 [`ClimaComms.CPU`](@ref) and [`ClimaComms.CUDA`](@ref) device options are currently supported.
@@ -9,7 +8,9 @@ struct SingletonCommsContext{D <: AbstractDevice} <: AbstractCommsContext
     device::D
 end
 
-SingletonCommsContext() = SingletonCommsContext(CPU())
+SingletonCommsContext() = SingletonCommsContext(device())
+
+device(ctx::SingletonCommsContext) = ctx.device
 
 init(::SingletonCommsContext) = (1, 1)
 
@@ -27,6 +28,7 @@ end
 function allreduce!(::SingletonCommsContext, sendrecvbuf, op)
     return nothing
 end
+
 struct SingletonGraphContext <: AbstractGraphContext
     context::SingletonCommsContext
 end

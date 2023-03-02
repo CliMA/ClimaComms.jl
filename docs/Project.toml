@@ -1,2 +1,3 @@
 [deps]
+ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"

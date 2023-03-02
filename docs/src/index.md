@@ -8,20 +8,29 @@ CurrentModule = ClimaComms
 ClimaComms
 ```
 
-### Contexts
-```@docs
-ClimaComms.AbstractCommsContext
-ClimaComms.AbstractGraphContext
-```
+## Devices
 
-### Devices
 ```@docs
 ClimaComms.AbstractDevice
-ClimaComms.CPU
-ClimaComms.CUDA
+ClimaComms.CPUDevice
+ClimaComms.CUDADevice
+ClimaComms.device
+ClimaComms.array_type
 ```
 
-### Communication interface
+## Contexts
+
+```@docs
+ClimaComms.AbstractCommsContext
+ClimaComms.SingletonCommsContext
+ClimaComms.MPICommsContext
+ClimaComms.AbstractGraphContext
+ClimaComms.context
+ClimaComms.graph_context
+```
+
+## Communication interface
+
 ```@docs
 ClimaComms.init
 ClimaComms.mypid
@@ -32,14 +41,7 @@ ClimaComms.reduce
 ClimaComms.allreduce
 ClimaComms.allreduce!
 ClimaComms.abort
-ClimaComms.graph_context
 ClimaComms.start
 ClimaComms.progress
 ClimaComms.finish
-```
-
-### Contexts
-
-```@docs
-ClimaComms.SingletonCommsContext
 ```

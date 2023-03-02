@@ -1,6 +1,3 @@
-if joinpath(@__DIR__, "..") ∉ LOAD_PATH
-    push!(LOAD_PATH, joinpath(@__DIR__, ".."))
-end
 using Documenter, ClimaComms
 
 format = Documenter.HTML(
