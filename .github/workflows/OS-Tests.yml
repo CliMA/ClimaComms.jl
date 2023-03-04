@@ -35,20 +35,12 @@ jobs:
             - 'src/**'
             - 'test/**'
             - 'Project.toml'
-            - 'backends/ClimaCommsMPI/src/**'
-            - 'backends/ClimaCommsMPI/test/**'
-            - 'backends/ClimaCommsMPI/Project.toml'
-            - 'backends/ClimaCommsMPI/test/Project.toml'
-            - 'backends/ClimaCommsSA/src/**'
-            - 'backends/ClimaCommsSA/test/**'
-            - 'backends/ClimaCommsSA/Project.toml'
-            - 'backends/ClimaCommsSA/test/Project.toml'
 
     - name: Set up Julia
       uses: julia-actions/setup-julia@latest
       if: steps.filter.outputs.run_test == 'true'
       with:
-        version: 1.7
+        version: 1.8
 
     - name: Cache artifacts
       uses: actions/cache@v1
@@ -69,21 +61,8 @@ jobs:
         julia --color=yes --project -e 'using Pkg; Pkg.instantiate()'
         julia --color=yes --project -e 'using Pkg; Pkg.precompile(;strict=true)'
         julia --color=yes --project -e 'using Pkg; Pkg.status()'
-        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.precompile(;strict=true)'
-        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.status()'
-#        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.develop(path="."); Pkg.instantiate()'
-#        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.precompile(;strict=true)'
-#        julia --color=yes --project=backends/ClimaCommsSA -e 'using Pkg; Pkg.status()'
 
     - name: Run MPI Unit Tests
       if: steps.filter.outputs.run_test == 'true'
       run: |
         julia --color=yes --project -e 'using Pkg; Pkg.test()'
-        julia --color=yes --project=backends/ClimaCommsMPI -e 'using Pkg; Pkg.test()'
-
-# Re-enable this when https://github.com/CliMA/ClimaComms.jl/issues/6 is fixed
-#    - name: Run Shared Arrays Unit Tests
-#      if: steps.filter.outputs.run_test == 'true'
-#      run: |
-#        julia --color=yes --project=backends\/ClimaCommsSA\/test backends\/ClimaCommsSA\/test\/runtests.jl

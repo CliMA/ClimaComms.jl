@@ -1,6 +1,3 @@
-module ClimaCommsMPI
-
-using ClimaComms
 using MPI
 
 """
@@ -9,46 +6,43 @@ using MPI
     MPICommsContext(device, comm)
 
 A MPI communications context, used for distributed runs.
-[`ClimaComms.CPU`](@ref) and [`ClimaComms.CUDA`](@ref) device options are currently supported.
+[`CPUDevice`](@ref) and [`CUDADevice`](@ref) device options are currently supported.
 """
-struct MPICommsContext{D <: ClimaComms.AbstractDevice, C <: MPI.Comm} <:
-       ClimaComms.AbstractCommsContext
+struct MPICommsContext{D <: AbstractDevice, C <: MPI.Comm} <:
+       AbstractCommsContext
     device::D
     mpicomm::C
 end
-MPICommsContext() = MPICommsContext(ClimaComms.CPU(), MPI.COMM_WORLD)
-MPICommsContext(device) = MPICommsContext(device, MPI.COMM_WORLD)
+MPICommsContext(device = device()) = MPICommsContext(device, MPI.COMM_WORLD)
 
-function ClimaComms.init(ctx::MPICommsContext)
+function init(ctx::MPICommsContext)
     if !MPI.Initialized()
         MPI.Init()
     end
-
-    return ClimaComms.mypid(ctx), ClimaComms.nprocs(ctx)
+    return mypid(ctx), nprocs(ctx)
 end
 
-ClimaComms.mypid(ctx::MPICommsContext) = MPI.Comm_rank(ctx.mpicomm) + 1
-ClimaComms.iamroot(ctx::MPICommsContext) = ClimaComms.mypid(ctx) == 1
-ClimaComms.nprocs(ctx::MPICommsContext) = MPI.Comm_size(ctx.mpicomm)
+mypid(ctx::MPICommsContext) = MPI.Comm_rank(ctx.mpicomm) + 1
+iamroot(ctx::MPICommsContext) = mypid(ctx) == 1
+nprocs(ctx::MPICommsContext) = MPI.Comm_size(ctx.mpicomm)
 
-ClimaComms.barrier(ctx::MPICommsContext) = MPI.Barrier(ctx.mpicomm)
+barrier(ctx::MPICommsContext) = MPI.Barrier(ctx.mpicomm)
 
-ClimaComms.reduce(ctx::MPICommsContext, val, op) =
-    MPI.Reduce(val, op, 0, ctx.mpicomm)
+reduce(ctx::MPICommsContext, val, op) = MPI.Reduce(val, op, 0, ctx.mpicomm)
 
-ClimaComms.allreduce(ctx::MPICommsContext, sendbuf, op) =
+allreduce(ctx::MPICommsContext, sendbuf, op) =
     MPI.Allreduce(sendbuf, op, ctx.mpicomm)
 
-ClimaComms.allreduce!(ctx::MPICommsContext, sendbuf, recvbuf, op) =
+allreduce!(ctx::MPICommsContext, sendbuf, recvbuf, op) =
     MPI.Allreduce!(sendbuf, recvbuf, op, ctx.mpicomm)
 
-ClimaComms.allreduce!(ctx::MPICommsContext, sendrecvbuf, op) =
+allreduce!(ctx::MPICommsContext, sendrecvbuf, op) =
     MPI.Allreduce!(sendrecvbuf, op, ctx.mpicomm)
 
-function ClimaComms.gather(ctx::MPICommsContext, array)
+function gather(ctx::MPICommsContext, array)
     dims = size(array)
     lengths = MPI.Gather(dims[end], 0, ctx.mpicomm)
-    if ClimaComms.iamroot(ctx)
+    if iamroot(ctx)
         dimsout = (dims[1:(end - 1)]..., sum(lengths))
         arrayout = similar(array, dimsout)
         recvbuf = MPI.VBuffer(arrayout, lengths .* prod(dims[1:(end - 1)]))
@@ -58,8 +52,7 @@ function ClimaComms.gather(ctx::MPICommsContext, array)
     MPI.Gatherv!(array, recvbuf, 0, ctx.mpicomm)
 end
 
-ClimaComms.abort(ctx::MPICommsContext, status::Int) =
-    MPI.Abort(ctx.mpicomm, status)
+abort(ctx::MPICommsContext, status::Int) = MPI.Abort(ctx.mpicomm, status)
 
 
 # We could probably do something fancier here?
@@ -79,7 +72,7 @@ end
 
 A simple ghost buffer implementation using MPI `Isend`/`Irecv` operations.
 """
-mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
+mutable struct MPISendRecvGraphContext <: AbstractGraphContext
     ctx::MPICommsContext
     tag::Cint
     send_bufs::Vector{MPI.Buffer}
@@ -95,7 +88,7 @@ end
 
 A simple ghost buffer implementation using MPI persistent send/receive operations.
 """
-struct MPIPersistentSendRecvGraphContext <: ClimaComms.AbstractGraphContext
+struct MPIPersistentSendRecvGraphContext <: AbstractGraphContext
     ctx::MPICommsContext
     tag::Cint
     send_bufs::Vector{MPI.Buffer}
@@ -106,7 +99,7 @@ struct MPIPersistentSendRecvGraphContext <: ClimaComms.AbstractGraphContext
     recv_reqs::MPI.UnsafeMultiRequest
 end
 
-function ClimaComms.graph_context(
+function graph_context(
     ctx::MPICommsContext,
     send_array,
     send_lengths,
@@ -179,7 +172,7 @@ function ClimaComms.graph_context(
     end
 end
 
-ClimaComms.graph_context(
+graph_context(
     ctx::MPICommsContext,
     send_array,
     send_lengths,
@@ -188,7 +181,7 @@ ClimaComms.graph_context(
     recv_lengths,
     recv_pids;
     persistent::Bool = true,
-) = ClimaComms.graph_context(
+) = graph_context(
     ctx,
     send_array,
     send_lengths,
@@ -199,10 +192,7 @@ ClimaComms.graph_context(
     persistent ? MPIPersistentSendRecvGraphContext : MPISendRecvGraphContext,
 )
 
-function ClimaComms.start(
-    ghost::MPISendRecvGraphContext;
-    dependencies = nothing,
-)
+function start(ghost::MPISendRecvGraphContext; dependencies = nothing)
     if !all(r -> r == MPI.REQUEST_NULL, ghost.recv_reqs)
         error("Must finish() before next start()")
     end
@@ -228,15 +218,12 @@ function ClimaComms.start(
     end
 end
 
-function ClimaComms.start(
-    ghost::MPIPersistentSendRecvGraphContext;
-    dependencies = nothing,
-)
+function start(ghost::MPIPersistentSendRecvGraphContext; dependencies = nothing)
     MPI.Startall(ghost.recv_reqs) # post receives
     MPI.Startall(ghost.send_reqs) # post sends
 end
 
-function ClimaComms.progress(
+function progress(
     ghost::Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext},
 )
     if isdefined(MPI, :MPI_ANY_SOURCE) # < v0.20
@@ -246,7 +233,7 @@ function ClimaComms.progress(
     end
 end
 
-function ClimaComms.finish(
+function finish(
     ghost::Union{MPISendRecvGraphContext, MPIPersistentSendRecvGraphContext};
     dependencies = nothing,
 )
@@ -256,5 +243,3 @@ function ClimaComms.finish(
     # TODO: these could be moved to start()? but we would need to add a finalizer to make sure they complete.
     MPI.Waitall(ghost.send_reqs)
 end
-
-end # module

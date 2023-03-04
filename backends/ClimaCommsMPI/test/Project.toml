@@ -1,9 +1,0 @@
-[deps]
-CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
-ClimaComms = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
-ClimaCommsMPI = "5f86816e-8b66-43b2-912e-75384f99de49"
-Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
-MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
-OffsetArrays = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
-Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
