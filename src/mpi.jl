@@ -16,6 +16,8 @@ end
 MPICommsContext(device = device()) = MPICommsContext(device, MPI.COMM_WORLD)
 
 function init(ctx::MPICommsContext)
+    ctx.device == CUDADevice() &&
+        (@assert MPI.has_cuda() "MPI is not CUDA-aware")
     if !MPI.Initialized()
         MPI.Init()
     end
