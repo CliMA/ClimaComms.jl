@@ -193,7 +193,7 @@ graph_context(
 )
 
 function start(ghost::MPISendRecvGraphContext; dependencies = nothing)
-    if !all(r -> r == MPI.isnull, ghost.recv_reqs)
+    if !all(MPI.isnull, ghost.recv_reqs)
         error("Must finish() before next start()")
     end
     # post receives
