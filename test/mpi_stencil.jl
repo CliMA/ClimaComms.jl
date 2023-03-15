@@ -6,3 +6,4 @@ include("stencil.jl")
 
 stencil_test(ClimaComms.MPICommsContext())
 stencil_test(ClimaComms.MPICommsContext(), persistent = true)
+stencil_test(ClimaComms.MPICommsContext(), persistent = false)
