@@ -24,7 +24,11 @@ function init(ctx::MPICommsContext)
             error("MPI implementation is not built with CUDA-aware interface")
         end
         # assign GPUs based on local rank
-        local_comm = MPI.Comm_split_type(ctx.mpicomm, MPI.COMM_TYPE_SHARED, MPI.Comm_rank(ctx.mpicomm))
+        local_comm = MPI.Comm_split_type(
+            ctx.mpicomm,
+            MPI.COMM_TYPE_SHARED,
+            MPI.Comm_rank(ctx.mpicomm),
+        )
         CUDA.device!(MPI.Comm_rank(local_comm) % CUDA.ndevices())
         MPI.free(local_comm)
     end

@@ -19,12 +19,6 @@ const default_niterations = 50
 # floating point precisions to test with
 const default_float_types = (Float64, Float32)
 
-# array types with which to test
-#const default_array_types = CUDA.has_cuda() ? (CuArray, Array) : (Array,)
-const default_array_types = (Array,)
-
-puts(s...) = ccall(:puts, Cint, (Cstring,), string(s...))
-
 epsilon(::Type{Float64}) = 1.0e-8
 epsilon(::Type{Float32}) = 0.0001f0
 coefx(::Type{Float64}) = 1.0
@@ -95,22 +89,23 @@ end
 # apply the stencil operator
 # TODO: ensure this uses FMAs
 function stencil(out, weight, radius, input, r, c)
-    @inbounds begin
-        @simd for ii in (-radius):radius
-            out[r, c] += weight[ii, 0] * input[r + ii, c]
-        end
-        @simd for jj in (-radius):-1
-            out[r, c] += weight[0, jj] * input[r, c + jj]
-        end
-        @simd for jj in 1:radius
-            out[r, c] += weight[0, jj] * input[r, c + jj]
+    CUDA.@allowscalar begin
+        @inbounds begin
+            @simd for ii in (-radius):radius
+                out[r, c] += weight[ii, 0] * input[r + ii, c]
+            end
+            @simd for jj in (-radius):-1
+                out[r, c] += weight[0, jj] * input[r, c + jj]
+            end
+            @simd for jj in 1:radius
+                out[r, c] += weight[0, jj] * input[r, c + jj]
+            end
         end
     end
 end
 
 function stencil_test(
     comms_ctx::ClimaComms.AbstractCommsContext;
-    array_types = default_array_types,
     float_types = default_float_types,
     n = default_n,
     radius = default_radius,
@@ -121,6 +116,8 @@ function stencil_test(
 
     # initialize and get processor info
     pid, nprocs = ClimaComms.init(comms_ctx)
+    device = ClimaComms.device(comms_ctx)
+    AT = ClimaComms.array_type(device)
 
     # log output only from pid 0
     logger_stream = ClimaComms.iamroot(comms_ctx) ? stderr : devnull
@@ -128,6 +125,8 @@ function stencil_test(
     atexit() do
         global_logger(prev_logger)
     end
+    @info "Running tests" comms_ctx array_type = AT
+
 
     # determine 2D grid of pids (closest to square)
     nprocsx, nprocsy = factor(nprocs)
@@ -145,7 +144,7 @@ function stencil_test(
     active_points = (n - 2radius) * (n - 2radius)
 
     # start tests
-    for AT in array_types, FT in float_types
+    for FT in float_types
         weight = setup_stencil(AT, FT, radius)
         input = setup_input(
             AT,
@@ -306,7 +305,8 @@ function stencil_test(
             end
 
             # add constant to solution to force refresh of neighbor data, if any
-            view(input, rstart:rend, cstart:cend) .+= 1.0
+            input_view = view(input, rstart:rend, cstart:cend)
+            CUDA.@allowscalar input_view .+= 1.0
         end
 
         # get time
