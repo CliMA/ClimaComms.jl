@@ -40,6 +40,7 @@ steps:
       - julia --project -e 'using Pkg; Pkg.test()'
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
+      JULIA_DEBUG: all
     agents:
       slurm_ntasks: 4
       slurm_gpus_per_task: 1
