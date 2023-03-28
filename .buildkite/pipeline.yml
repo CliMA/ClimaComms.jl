@@ -29,6 +29,8 @@ steps:
     key: "cpu_tests"
     command:
       - julia --project -e 'using Pkg; Pkg.test()'
+    env:
+      CLIMACOMMS_TEST_DEVICE: CPU
     agents:
       slurm_ntasks: 4
 
@@ -36,6 +38,8 @@ steps:
     key: "gpu_tests"
     command:
       - julia --project -e 'using Pkg; Pkg.test()'
+    env:
+      CLIMACOMMS_TEST_DEVICE: CUDA
     agents:
       slurm_ntasks: 4
       slurm_gpus_per_task: 1

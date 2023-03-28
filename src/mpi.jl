@@ -15,6 +15,9 @@ struct MPICommsContext{D <: AbstractDevice, C <: MPI.Comm} <:
 end
 MPICommsContext(device = device()) = MPICommsContext(device, MPI.COMM_WORLD)
 
+device(ctx::MPICommsContext) = ctx.device
+
+
 function init(ctx::MPICommsContext)
     if !MPI.Initialized()
         MPI.Init()
@@ -29,7 +32,7 @@ function init(ctx::MPICommsContext)
             MPI.COMM_TYPE_SHARED,
             MPI.Comm_rank(ctx.mpicomm),
         )
-        CUDA.device!(MPI.Comm_rank(local_comm) % CUDA.ndevices())
+        CUDA_jl.device!(MPI.Comm_rank(local_comm) % CUDA_jl.ndevices())
         MPI.free(local_comm)
     end
     return mypid(ctx), nprocs(ctx)
