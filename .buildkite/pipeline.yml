@@ -6,6 +6,7 @@ agents:
 env:
   JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
   JULIA_CUDA_USE_BINARYBUILDER: false
+  JULIA_CUDA_MEMORY_POOL: none
   OPENBLAS_NUM_THREADS: 1
 
 steps:
@@ -32,7 +33,8 @@ steps:
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
     agents:
-      slurm_ntasks: 4
+      slurm_nodes: 1
+      slurm_ntasks_per_node: 4
 
   - label: ":flower_playing_cards: tests"
     key: "gpu_tests"
@@ -40,7 +42,7 @@ steps:
       - julia --project -e 'using Pkg; Pkg.test()'
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
-      JULIA_DEBUG: all
     agents:
-      slurm_ntasks: 4
+      slurm_nodes: 1
+      slurm_ntasks_per_node: 2
       slurm_gpus_per_task: 1
