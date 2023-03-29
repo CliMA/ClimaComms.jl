@@ -42,6 +42,7 @@ steps:
       - julia --project -e 'using Pkg; Pkg.test()'
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
+      JULIA_DEBUG: CUDA_Runtime_jll
     agents:
       slurm_nodes: 1
       slurm_ntasks_per_node: 2
