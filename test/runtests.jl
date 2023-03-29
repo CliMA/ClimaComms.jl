@@ -1,8 +1,4 @@
 using CUDA, CUDA_Runtime_jll
-@show CUDA.CUDA_Runtime
-@show CUDA_Runtime_jll.preferences
-
-
 
 include("basic.jl")
 
