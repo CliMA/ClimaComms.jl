@@ -16,7 +16,7 @@ Use the CPU.
 """
 struct CPUDevice <: AbstractDevice end
 
-Base.@deprecate_binding CPU CPUDevice
+Base.@deprecate_binding CPU CPUDevice false
 
 """
     CUDADevice()
@@ -25,7 +25,7 @@ Use NVIDIA GPU accelarator
 """
 struct CUDADevice <: AbstractDevice end
 
-Base.@deprecate_binding CUDA CUDADevice
+Base.@deprecate_binding CUDA CUDADevice false
 
 """
     ClimaComms.device()

@@ -131,18 +131,20 @@ A context for communicating between processes in a graph.
 abstract type AbstractGraphContext end
 
 """
-    graph_context(context::AbstractCommsContext, sendarray, sendpids, sendlengths, recvarray, recvpids, recvlengths)
+    graph_context(context::AbstractCommsContext, 
+        sendarray, sendlengths, sendpids, 
+        recvarray, recvlengths, recvpids)
 
 Construct a communication context for exchanging neighbor data via a graph.
 
 Arguments:
 - `context`: the communication context on which to construct the graph context.
 - `sendarray`: array containing data to send
-- `sendpids`: list of processor IDs to send
 - `sendlengths`: list of lengths of data to send to each process ID
+- `sendpids`: list of processor IDs to send
 - `recvarray`: array to receive data into
-- `recvpids`: list of processor IDs to receive from
 - `recvlengths`: list of lengths of data to receive from each process ID
+- `recvpids`: list of processor IDs to receive from
 
 This should return an `AbstractGraphContext` object.
 """

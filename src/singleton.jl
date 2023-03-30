@@ -33,8 +33,7 @@ struct SingletonGraphContext <: AbstractGraphContext
     context::SingletonCommsContext
 end
 
-graph_context(ctx::SingletonCommsContext, kwargs...) =
-    SingletonGraphContext(ctx)
+graph_context(ctx::SingletonCommsContext, args...) = SingletonGraphContext(ctx)
 
 start(gctx::SingletonGraphContext) = nothing
 progress(gctx::SingletonGraphContext) = nothing

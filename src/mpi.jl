@@ -15,11 +15,25 @@ struct MPICommsContext{D <: AbstractDevice, C <: MPI.Comm} <:
 end
 MPICommsContext(device = device()) = MPICommsContext(device, MPI.COMM_WORLD)
 
+device(ctx::MPICommsContext) = ctx.device
+
+
 function init(ctx::MPICommsContext)
-    ctx.device == CUDADevice() &&
-        (@assert MPI.has_cuda() "MPI is not CUDA-aware")
     if !MPI.Initialized()
         MPI.Init()
+    end
+    if ctx.device isa CUDADevice
+        if !MPI.has_cuda()
+            error("MPI implementation is not built with CUDA-aware interface")
+        end
+        # assign GPUs based on local rank
+        local_comm = MPI.Comm_split_type(
+            ctx.mpicomm,
+            MPI.COMM_TYPE_SHARED,
+            MPI.Comm_rank(ctx.mpicomm),
+        )
+        CUDA_jl.device!(MPI.Comm_rank(local_comm) % CUDA_jl.ndevices())
+        MPI.free(local_comm)
     end
     return mypid(ctx), nprocs(ctx)
 end
