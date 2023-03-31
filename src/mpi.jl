@@ -55,6 +55,8 @@ allreduce!(ctx::MPICommsContext, sendbuf, recvbuf, op) =
 allreduce!(ctx::MPICommsContext, sendrecvbuf, op) =
     MPI.Allreduce!(sendrecvbuf, op, ctx.mpicomm)
 
+bcast(ctx::MPICommsContext, object) = MPI.bcast(object, ctx.mpicomm; root = 0)
+
 function gather(ctx::MPICommsContext, array)
     dims = size(array)
     lengths = MPI.Gather(dims[end], 0, ctx.mpicomm)

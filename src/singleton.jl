@@ -21,6 +21,8 @@ barrier(::SingletonCommsContext) = nothing
 reduce(::SingletonCommsContext, val, op) = val
 gather(::SingletonCommsContext, array) = array
 allreduce(::SingletonCommsContext, sendbuf, op) = sendbuf
+bcast(::SingletonCommsContext, object) = object
+
 function allreduce!(::SingletonCommsContext, sendbuf, recvbuf, op)
     copyto!(recvbuf, sendbuf)
     return nothing
