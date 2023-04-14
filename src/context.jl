@@ -115,6 +115,14 @@ concattenating along the last dimension.
 gather(::Nothing, array) = array
 
 """
+    bcast(ctx::AbstractCommsContext, object)
+
+Broadcast `object` from the root process to all other processes.
+The value of `object` on non-root processes is ignored.
+"""
+function bcast end
+
+"""
     abort(ctx::CC, status::Int) where {CC <: AbstractCommsContext}
 
 Terminate the caller and all participating processors with the specified

@@ -186,3 +186,13 @@ end
         end
     end
 end
+
+@testset "bcast" begin
+    @test ClimaComms.bcast(context, ClimaComms.iamroot(context))
+    @test ClimaComms.bcast(context, pid) == 1
+    @test ClimaComms.bcast(context, "root pid is $pid") == "root pid is 1"
+    @test ClimaComms.bcast(context, AT(fill(Float32(pid), 3))) ==
+          AT(fill(Float32(1), 3))
+    @test ClimaComms.bcast(context, AT(fill(Float64(pid), 3))) ==
+          AT(fill(Float64(1), 3))
+end

@@ -29,18 +29,29 @@ ClimaComms.context
 ClimaComms.graph_context
 ```
 
-## Communication interface
+## Context operations
 
 ```@docs
 ClimaComms.init
 ClimaComms.mypid
 ClimaComms.iamroot
 ClimaComms.nprocs
+ClimaComms.abort
+```
+
+## Collective operations
+
+```@docs
 ClimaComms.barrier
 ClimaComms.reduce
 ClimaComms.allreduce
 ClimaComms.allreduce!
-ClimaComms.abort
+ClimaComms.bcast
+```
+
+### Graph exchange
+
+```@docs
 ClimaComms.start
 ClimaComms.progress
 ClimaComms.finish
