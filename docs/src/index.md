@@ -12,7 +12,9 @@ ClimaComms
 
 ```@docs
 ClimaComms.AbstractDevice
-ClimaComms.CPUDevice
+ClimaComms.AbstractCPUDevice
+ClimaComms.CPUSingleThreading
+ClimaComms.CPUMultiThreading
 ClimaComms.CUDADevice
 ClimaComms.device
 ClimaComms.array_type

@@ -13,7 +13,11 @@ end
 
 if haskey(ENV, "CLIMACOMMS_TEST_DEVICE")
     if ENV["CLIMACOMMS_TEST_DEVICE"] == "CPU"
-        @test device isa ClimaComms.CPUDevice
+        @test device isa ClimaComms.AbstractCPUDevice
+    elseif ENV["CLIMACOMMS_TEST_DEVICE"] == "CPUSingleThreaded"
+        @test device isa ClimaComms.CPUSingleThreaded
+    elseif ENV["CLIMACOMMS_TEST_DEVICE"] == "CPUMultiThreaded"
+        @test device isa ClimaComms.CPUMultiThreaded
     elseif ENV["CLIMACOMMS_TEST_DEVICE"] == "CUDA"
         @test device isa ClimaComms.CUDADevice
     end

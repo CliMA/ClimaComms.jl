@@ -6,7 +6,7 @@ using MPI
     MPICommsContext(device, comm)
 
 A MPI communications context, used for distributed runs.
-[`CPUDevice`](@ref) and [`CUDADevice`](@ref) device options are currently supported.
+[`AbstractCPUDevice`](@ref) and [`CUDADevice`](@ref) device options are currently supported.
 """
 struct MPICommsContext{D <: AbstractDevice, C <: MPI.Comm} <:
        AbstractCommsContext
