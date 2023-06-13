@@ -32,7 +32,7 @@ function init(ctx::MPICommsContext)
             MPI.COMM_TYPE_SHARED,
             MPI.Comm_rank(ctx.mpicomm),
         )
-        CUDA_jl.device!(MPI.Comm_rank(local_comm) % CUDA_jl.ndevices())
+        CUDA.device!(MPI.Comm_rank(local_comm) % CUDA.ndevices())
         MPI.free(local_comm)
     end
     return mypid(ctx), nprocs(ctx)
