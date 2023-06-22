@@ -18,6 +18,7 @@ ClimaComms.CPUMultiThreading
 ClimaComms.CUDADevice
 ClimaComms.device
 ClimaComms.array_type
+ClimaComms.@threaded
 ```
 
 ## Contexts
