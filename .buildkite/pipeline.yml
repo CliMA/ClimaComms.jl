@@ -37,6 +37,15 @@ steps:
       slurm_nodes: 1
       slurm_ntasks_per_node: 4
 
+  - label: ":computer: threaded tests"
+    key: "cpu_threaded_tests"
+    command:
+      - julia --threads 8 --project -e 'using Pkg; Pkg.test()'
+    env:
+      CLIMACOMMS_TEST_DEVICE: CPU
+    agents:
+      slurm_cpus_per_task: 8
+
   - label: ":flower_playing_cards: tests"
     key: "gpu_tests"
     command:
