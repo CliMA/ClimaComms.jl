@@ -53,7 +53,8 @@ function device()
     env_var = get(ENV, "CLIMACOMMS_DEVICE", nothing)
     if !isnothing(env_var)
         if env_var == "CPU"
-            Threads.nthreads() > 1 ? CPUMultiThreaded() : CPUSingleThreaded()
+            return Threads.nthreads() > 1 ? CPUMultiThreaded() :
+                   CPUSingleThreaded()
         elseif env_var == "CPUSingleThreaded"
             return CPUSingleThreaded()
         elseif env_var == "CPUMultiThreaded"
