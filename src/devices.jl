@@ -107,3 +107,55 @@ macro threaded(device, expr)
         end
     end
 end
+
+"""
+    @time device expr
+
+Device-flexible `@time`.
+
+Lowers to
+```julia
+@time expr
+```
+for CPU devices and
+```julia
+CUDA.@time expr
+```
+for CUDA devices.
+"""
+macro time(device, expr)
+    return quote
+        if $(esc(device)) isa CUDADevice
+            CUDA.@time $(esc(expr))
+        else
+            @assert $(esc(device)) isa AbstractDevice
+            Base.@time $(esc(expr))
+        end
+    end
+end
+
+"""
+    @elapsed device expr
+
+Device-flexible `@elapsed`.
+
+Lowers to
+```julia
+@elapsed expr
+```
+for CPU devices and
+```julia
+CUDA.@elapsed expr
+```
+for CUDA devices.
+"""
+macro elapsed(device, expr)
+    return quote
+        if $(esc(device)) isa CUDADevice
+            CUDA.@elapsed $(expr)
+        else
+            @assert $(esc(device)) isa AbstractDevice
+            Base.@elapsed $(expr)
+        end
+    end
+end
