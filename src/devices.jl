@@ -102,7 +102,7 @@ macro threaded(device, expr)
         if $(esc(device)) isa CPUMultiThreaded
             Threads.@threads $(expr)
         else
-            @assert $(esc(device)) isa CPUSingleThreaded
+            @assert $(esc(device)) isa AbstractDevice
             $(esc(expr))
         end
     end
