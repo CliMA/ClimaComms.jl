@@ -19,6 +19,8 @@ ClimaComms.CUDADevice
 ClimaComms.device
 ClimaComms.array_type
 ClimaComms.@threaded
+ClimaComms.@time
+ClimaComms.@elapsed
 ```
 
 ## Contexts

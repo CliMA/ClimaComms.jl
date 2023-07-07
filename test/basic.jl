@@ -24,7 +24,7 @@ if haskey(ENV, "CLIMACOMMS_TEST_DEVICE")
 end
 
 using SafeTestsets
-@safetestset "@threaded hygiene" begin
+@safetestset "macro hygiene" begin
     include("hygiene.jl")
 end
 
