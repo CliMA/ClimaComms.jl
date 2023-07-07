@@ -23,6 +23,10 @@ if haskey(ENV, "CLIMACOMMS_TEST_DEVICE")
     end
 end
 
+using SafeTestsets
+@safetestset "@threaded hygiene" begin
+    include("hygiene.jl")
+end
 
 if context isa ClimaComms.MPICommsContext
     graph_opt_list = [(; persistent = true), (; persistent = false)]

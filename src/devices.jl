@@ -98,14 +98,12 @@ that this is statically inferred.
  - https://discourse.julialang.org/t/overhead-of-threads-threads/53964
 """
 macro threaded(device, expr)
-    return esc(quote
-        let
-            if $device isa ClimaComms.CPUMultiThreaded
-                Threads.@threads $(expr)
-            else
-                @assert $device isa ClimaComms.CPUSingleThreaded
-                $(expr)
-            end
+    return quote
+        if $(esc(device)) isa CPUMultiThreaded
+            Threads.@threads $(expr)
+        else
+            @assert $(esc(device)) isa CPUSingleThreaded
+            $(esc(expr))
         end
-    end)
+    end
 end
