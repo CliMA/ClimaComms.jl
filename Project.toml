@@ -12,3 +12,6 @@ Requires = "ae029012-a4dd-5104-9daa-d747884805df"
 CUDA = "3, 4"
 MPI = "0.20.6"
 julia = "1.8"
+
+[extensions]
+BenchmarkToolsExt = "BenchmarkTools"

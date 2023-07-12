@@ -1,5 +1,9 @@
+module BenchmarkToolsExt
+
+isdefined(Base, :get_extension) ? (import BenchmarkTools) :
+(import ..BenchmarkTools)
+
 import CUDA
-import .BenchmarkTools
 
 #=
 This file is conditionally loaded
@@ -35,4 +39,6 @@ macro benchmark(device, expr)
             BenchmarkTools.@benchmark $(expr)
         end
     end
+end
+
 end
