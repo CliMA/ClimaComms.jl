@@ -97,13 +97,17 @@ that this is statically inferred.
  - https://discourse.julialang.org/t/threads-threads-with-one-thread-how-to-remove-the-overhead/58435
  - https://discourse.julialang.org/t/overhead-of-threads-threads/53964
 """
-macro threaded(device, expr)
-    return quote
+macro threaded(device, loop)
+    quote
         if $(esc(device)) isa CPUMultiThreaded
-            Threads.@threads $(expr)
+            Threads.@threads $(Expr(
+                loop.head,
+                Expr(loop.args[1].head, esc.(loop.args[1].args)...),
+                esc(loop.args[2]),
+            ))
         else
             @assert $(esc(device)) isa AbstractDevice
-            $(esc(expr))
+            $(esc(loop))
         end
     end
 end
@@ -152,10 +156,10 @@ for CUDA devices.
 macro elapsed(device, expr)
     return quote
         if $(esc(device)) isa CUDADevice
-            CUDA.@elapsed $(expr)
+            CUDA.@elapsed $(esc(expr))
         else
             @assert $(esc(device)) isa AbstractDevice
-            Base.@elapsed $(expr)
+            Base.@elapsed $(esc(expr))
         end
     end
 end
