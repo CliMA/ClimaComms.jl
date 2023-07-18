@@ -14,9 +14,9 @@ function context(device = device())
     name = get(ENV, "CLIMACOMMS_CONTEXT", nothing)
     if !isnothing(name)
         if name == "MPI"
-            return MPICommsContext()
+            return MPICommsContext(device)
         elseif name == "SINGLETON"
-            return SingletonCommsContext()
+            return SingletonCommsContext(device)
         else
             error("Invalid context: $name")
         end
