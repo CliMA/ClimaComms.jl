@@ -10,7 +10,7 @@ it will return a [`SingletonCommsContext`](@ref).
 Behavior can be overridden by setting the `CLIMACOMMS_CONTEXT` environment variable
 to either `MPI` or `SINGLETON`.
 """
-function context(device = device())
+function context(device::AbstractDevice = device())
     name = get(ENV, "CLIMACOMMS_CONTEXT", nothing)
     if !isnothing(name)
         if name == "MPI"
