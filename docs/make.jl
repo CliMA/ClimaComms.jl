@@ -6,7 +6,7 @@ format = Documenter.HTML(
 )
 makedocs(
     sitename = "ClimaComms.jl",
-    strict = false,
+    warnonly = true,
     format = format,
     checkdocs = :exports,
     clean = true,
