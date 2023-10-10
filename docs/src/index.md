@@ -21,6 +21,7 @@ ClimaComms.array_type
 ClimaComms.@threaded
 ClimaComms.@time
 ClimaComms.@elapsed
+ClimaComms.@sync
 ```
 
 ## Contexts

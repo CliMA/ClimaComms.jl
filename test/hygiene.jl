@@ -14,6 +14,10 @@ function test_macro_hyhiene(dev)
     CC.@elapsed dev for i in 1:n
         sin.(rand(10))
     end
+
+    CC.@sync dev for i in 1:n
+        sin.(rand(10))
+    end
 end
 dev = CC.device()
 
