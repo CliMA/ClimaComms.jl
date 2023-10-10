@@ -18,3 +18,4 @@ end
 dev = CC.device()
 
 test_macro_hyhiene(dev)
+
