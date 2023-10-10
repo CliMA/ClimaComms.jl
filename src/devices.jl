@@ -163,3 +163,34 @@ macro elapsed(device, expr)
         end
     end
 end
+
+"""
+    @sync device expr
+
+Device-flexible `@sync`.
+
+Lowers to
+```julia
+@sync expr
+```
+for CPU devices and
+```julia
+CUDA.@sync expr
+```
+for CUDA devices.
+"""
+macro sync(device, expr)
+    # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
+    return esc(quote
+        if $(device) isa $CUDADevice
+            $CUDA.@sync begin
+                $(expr)
+            end
+        else
+            @assert $(device) isa $AbstractDevice
+            $Base.@sync begin
+                $(expr)
+            end
+        end
+    end)
+end
