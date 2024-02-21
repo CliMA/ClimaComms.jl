@@ -46,6 +46,12 @@ barrier(ctx::MPICommsContext) = MPI.Barrier(ctx.mpicomm)
 
 reduce(ctx::MPICommsContext, val, op) = MPI.Reduce(val, op, 0, ctx.mpicomm)
 
+reduce!(ctx::MPICommsContext, sendbuf, recvbuf, op) =
+    MPI.Reduce!(sendbuf, recvbuf, op, ctx.mpicomm; root = 0)
+
+reduce!(ctx::MPICommsContext, sendrecvbuf, op) =
+    MPI.Reduce!(sendrecvbuf, op, ctx.mpicomm; root = 0)
+
 allreduce(ctx::MPICommsContext, sendbuf, op) =
     MPI.Allreduce(sendbuf, op, ctx.mpicomm)
 

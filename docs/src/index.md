@@ -50,6 +50,7 @@ ClimaComms.abort
 ```@docs
 ClimaComms.barrier
 ClimaComms.reduce
+ClimaComms.reduce!
 ClimaComms.allreduce
 ClimaComms.allreduce!
 ClimaComms.bcast

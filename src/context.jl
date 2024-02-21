@@ -88,6 +88,16 @@ function reduce end
 reduce(::Nothing, val, op) = val
 
 """
+    reduce!(ctx::CC, sendbuf, recvbuf, op)
+    reduce!(ctx::CC, sendrecvbuf, op)
+
+Performs elementwise reduction using the operator `op` on the buffer `sendbuf`, storing the result in the `recvbuf` of the process.
+If only one `sendrecvbuf` buffer is provided, then the operation is performed in-place.
+
+"""
+function reduce! end
+
+"""
     allreduce(ctx::CC, sendbuf, op)
 
 Performs elementwise reduction using the operator `op` on the buffer `sendbuf`, allocating a new array for the result.
