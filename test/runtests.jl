@@ -1,12 +1,24 @@
 using CUDA, CUDA_Runtime_jll
+using Test
 
-include("basic.jl")
+function runsingleton(file)
+    Base.run(
+        Cmd(
+            `$(Base.julia_cmd()) --threads $(Threads.nthreads()) --startup-file=no --project=$(Base.active_project()) $file`,
+            env = ("CLIMACOMMS_CONTEXT" => "SINGLETON",),
+        ),
+    )
+end
 
-using MPI, Test
+@test success(runsingleton(joinpath(@__DIR__, "basic.jl")))
+
+using MPI
 
 function runmpi(file; ntasks = 1)
+    # See https://github.com/JuliaParallel/MPI.jl/issues/820
+    mpiexec = get(ENV, "MPITRAMPOLINE_MPIEXEC", MPI.mpiexec())
     Base.run(
-        `$(MPI.mpiexec()) -n $ntasks $(Base.julia_cmd()) --startup-file=no --project=$(Base.active_project()) $file`,
+        `$mpiexec -n $ntasks $(Base.julia_cmd()) --startup-file=no --project=$(Base.active_project()) $file`,
     )
 end
 

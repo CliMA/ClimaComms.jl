@@ -1,12 +1,9 @@
 agents:
-  queue: central
+  queue: new-central
   slurm_mem: 8G
-  modules: julia/1.9.3 cuda/12.2 ucx/1.14.1_cuda-12.2 openmpi/4.1.5_cuda-12.2 hdf5/1.12.2-ompi415 nsight-systems/2023.2.1
+  modules: climacommon/2024_03_18
 
 env:
-  JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
-  JULIA_CUDA_USE_BINARYBUILDER: false
-  JULIA_CUDA_MEMORY_POOL: none
   OPENBLAS_NUM_THREADS: 1
 
 steps:
@@ -19,7 +16,10 @@ steps:
       - "julia --project -e 'using CUDA; CUDA.precompile_runtime()'"
       - "julia --project -e 'using Pkg; Pkg.status()'"
 
+      - "julia --project=test -e 'using Pkg; Pkg.develop(;path=\".\"); Pkg.instantiate(;verbose=true); Pkg.precompile(;strict=true)'"
+
     agents:
+      slurm_gpus: 1
       slurm_cpus_per_task: 8
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8
@@ -29,7 +29,7 @@ steps:
   - label: ":computer: tests"
     key: "cpu_tests"
     command:
-      - julia --project -e 'using Pkg; Pkg.test()'
+      - julia --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
     agents:
@@ -39,7 +39,7 @@ steps:
   - label: ":computer: threaded tests"
     key: "cpu_threaded_tests"
     command:
-      - julia --threads 8 --project -e 'using Pkg; Pkg.test()'
+      - julia --threads 8 --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
     agents:
@@ -48,7 +48,7 @@ steps:
   - label: ":flower_playing_cards: tests"
     key: "gpu_tests"
     command:
-      - julia --project -e 'using Pkg; Pkg.test()'
+      - julia --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
     agents:
