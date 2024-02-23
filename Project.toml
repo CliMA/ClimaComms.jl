@@ -6,8 +6,9 @@ authors = [
     "Charles Kawczynski <charliek@caltech.edu>",
     "Sriharsha Kandala <Sriharsha.kvs@gmail.com>",
     "Jake Bolewski <clima-software@caltech.edu>",
+    "Gabriele Bozzola <gbozzola@caltech.edu>",
 ]
-version = "0.5.6"
+version = "0.5.7"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"

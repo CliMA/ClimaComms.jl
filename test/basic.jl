@@ -172,13 +172,26 @@ end
     end
 end
 
-@testset "reduce/allreduce" begin
+@testset "reduce/reduce!/allreduce" begin
     for FT in (Float32, Float64)
         pidsum = div(nprocs * (nprocs + 1), 2)
 
         sendrecvbuf = AT(fill(FT(pid), 3))
         ClimaComms.allreduce!(context, sendrecvbuf, +)
         @test sendrecvbuf == AT(fill(FT(pidsum), 3))
+
+        sendrecvbuf = AT(fill(FT(pid), 3))
+        ClimaComms.reduce!(context, sendrecvbuf, +)
+        if ClimaComms.iamroot(context)
+            @test sendrecvbuf == AT(fill(FT(pidsum), 3))
+        end
+
+        sendbuf = AT(fill(FT(pid), 2))
+        recvbuf = AT(zeros(FT, 2))
+        ClimaComms.reduce!(context, sendbuf, recvbuf, +)
+        if ClimaComms.iamroot(context)
+            @test recvbuf == AT(fill(FT(pidsum), 2))
+        end
 
         sendbuf = AT(fill(FT(pid), 2))
         recvbuf = AT(zeros(FT, 2))

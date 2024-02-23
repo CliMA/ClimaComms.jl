@@ -23,6 +23,14 @@ gather(::SingletonCommsContext, array) = array
 allreduce(::SingletonCommsContext, sendbuf, op) = sendbuf
 bcast(::SingletonCommsContext, object) = object
 
+function reduce!(::SingletonCommsContext, sendbuf, recvbuf, op)
+    copyto!(recvbuf, sendbuf)
+    return nothing
+end
+function reduce!(::SingletonCommsContext, sendrecvbuf, op)
+    return nothing
+end
+
 function allreduce!(::SingletonCommsContext, sendbuf, recvbuf, op)
     copyto!(recvbuf, sendbuf)
     return nothing
