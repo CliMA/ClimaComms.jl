@@ -34,6 +34,13 @@ steps:
       slurm_nodes: 1
       slurm_ntasks_per_node: 4
 
+  - label: ":computer: tests one task = singleton"
+    key: "singleton_test"
+    command:
+      - julia --project -e 'using ClimaComms; @assert ClimaComms.context() isa ClimaComms.SingletonCommsContext'
+    env:
+      CLIMACOMMS_TEST_DEVICE: CPU
+
   - label: ":computer: threaded tests"
     key: "cpu_threaded_tests"
     command:

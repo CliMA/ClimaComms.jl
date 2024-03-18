@@ -21,14 +21,25 @@ function context(device = device())
             error("Invalid context: $name")
         end
     end
+
+    detected_context = SingletonCommsContext(device)
+
     # detect common environment variables used by MPI launchers
     #   PMI_RANK appears to be used by MPICH and srun
     #   OMPI_COMM_WORLD_RANK appears to be used by OpenMPI
-    if haskey(ENV, "PMI_RANK") || haskey(ENV, "OMPI_COMM_WORLD_RANK")
-        return MPICommsContext(device)
-    else
-        return SingletonCommsContext(device)
+    if haskey(ENV, "PMI_RANK")
+        # For srun, we have a SLURM_NTASKS variables to check the total number
+        # of tasks, for 1 task, we run in SingletonCommsContext(device)
+        if get(ENV, "SLURM_NTASKS", nothing) == "1"
+            detected_context = SingletonCommsContext(device)
+        else
+            detected_context = MPICommsContext(device)
+        end
+    elseif haskey(ENV, "OMPI_COMM_WORLD_RANK")
+        detected_context = MPICommsContext(device)
     end
+
+    return detected_context
 end
 
 """
@@ -149,8 +160,8 @@ A context for communicating between processes in a graph.
 abstract type AbstractGraphContext end
 
 """
-    graph_context(context::AbstractCommsContext, 
-        sendarray, sendlengths, sendpids, 
+    graph_context(context::AbstractCommsContext,
+        sendarray, sendlengths, sendpids,
         recvarray, recvlengths, recvpids)
 
 Construct a communication context for exchanging neighbor data via a graph.
