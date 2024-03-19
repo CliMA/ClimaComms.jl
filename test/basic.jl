@@ -95,7 +95,7 @@ end
         ClimaComms.progress(graph_context)
         ClimaComms.finish(graph_context)
         # ClimaComms.barrier(graph_context)
-        @show pid, recvarray
+        @show ClimaComms.mypid(context) ClimaComms.mypid(graph_context) pid recvarray
 
         @test all(==(FT(pid)), recvarray)
     end
