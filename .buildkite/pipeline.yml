@@ -19,6 +19,8 @@ steps:
       - "julia --project -e 'using CUDA; CUDA.precompile_runtime()'"
       - "julia --project -e 'using Pkg; Pkg.status()'"
 
+      - "julia --project=test/test_artifacts -e 'using Pkg; Pkg.develop(;path=\".\"); Pkg.instantiate()'"
+
     agents:
       slurm_cpus_per_task: 8
     env:
@@ -55,3 +57,28 @@ steps:
       slurm_nodes: 1
       slurm_ntasks_per_node: 2
       slurm_gpus_per_task: 1
+
+  # The artifacts jobs cannot be concurrent
+  - label: ":amphora: artifacts"
+    key: "artifacts"
+    command:
+      - julia --project=test/test_artifacts test/test_artifacts/test_clima_artifacts.jl
+    env:
+      CLIMACOMMS_TEST_DEVICE: CPU
+    agents:
+      slurm_nodes: 1
+      slurm_ntasks_per_node: 1
+    concurrency: 1
+    concurrency_group: 'artifacts'
+
+  - label: ":amphora::amphora: artifacts (MPI)"
+    key: "mpi_artifacts"
+    command:
+      - julia --project=test/test_artifacts test/test_artifacts/test_clima_artifacts.jl
+    env:
+      CLIMACOMMS_TEST_DEVICE: CPU
+    agents:
+      slurm_nodes: 1
+      slurm_ntasks_per_node: 2
+    concurrency: 1
+    concurrency_group: 'artifacts'

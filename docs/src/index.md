@@ -63,3 +63,9 @@ ClimaComms.start
 ClimaComms.progress
 ClimaComms.finish
 ```
+
+## Artifacts
+
+```@docs
+ClimaComms.@clima_artifact
+```

@@ -1,16 +1,10 @@
 name = "ClimaComms"
 uuid = "3a4d1b5c-c61d-41fd-a00a-5873ba7a1b0d"
-authors = [
-    "Kiran Pamnany <clima-software@caltech.edu>",
-    "Simon Byrne <simonbyrne@caltech.edu>",
-    "Charles Kawczynski <charliek@caltech.edu>",
-    "Sriharsha Kandala <Sriharsha.kvs@gmail.com>",
-    "Jake Bolewski <clima-software@caltech.edu>",
-    "Gabriele Bozzola <gbozzola@caltech.edu>",
-]
-version = "0.5.7"
+authors = ["Kiran Pamnany <clima-software@caltech.edu>", "Simon Byrne <simonbyrne@caltech.edu>", "Charles Kawczynski <charliek@caltech.edu>", "Sriharsha Kandala <Sriharsha.kvs@gmail.com>", "Jake Bolewski <clima-software@caltech.edu>", "Gabriele Bozzola <gbozzola@caltech.edu>"]
+version = "0.5.8"
 
 [deps]
+Artifacts = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
 
