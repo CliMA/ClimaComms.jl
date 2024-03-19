@@ -94,6 +94,7 @@ end
         ClimaComms.start(graph_context)
         ClimaComms.progress(graph_context)
         ClimaComms.finish(graph_context)
+        # ClimaComms.barrier(graph_context)
         @show pid
         @show recvarray
 

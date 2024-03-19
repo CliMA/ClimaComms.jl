@@ -1,16 +1,7 @@
 using CUDA, CUDA_Runtime_jll
 using Test
 
-function runsingleton(file)
-    Base.run(
-        Cmd(
-            `$(Base.julia_cmd()) --startup-file=no --project=$(Base.active_project()) $file`,
-            env = ("CLIMACOMMS_CONTEXT" => "SINGLETON",),
-        ),
-    )
-end
-
-@test success(runsingleton(joinpath(@__DIR__, "basic.jl")))
+include("basic.jl")
 
 using MPI
 
