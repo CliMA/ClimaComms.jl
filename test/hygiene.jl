@@ -18,6 +18,10 @@ function test_macro_hyhiene(dev)
     CC.@sync dev for i in 1:n
         sin.(rand(10))
     end
+
+    CC.@cuda_sync dev for i in 1:n
+        sin.(rand(10))
+    end
 end
 dev = CC.device()
 

@@ -22,6 +22,7 @@ ClimaComms.@threaded
 ClimaComms.@time
 ClimaComms.@elapsed
 ClimaComms.@sync
+ClimaComms.@cuda_sync
 ```
 
 ## Contexts

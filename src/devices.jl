@@ -178,6 +178,25 @@ for CPU devices and
 CUDA.@sync expr
 ```
 for CUDA devices.
+
+An example use-case of this might be:
+```julia
+BenchmarkTools.@benchmark begin
+    if ClimaComms.device() isa ClimaComms.CUDADevice
+        CUDA.@sync begin
+            launch_cuda_kernels_or_spawn_tasks!(...)
+        end
+    elseif ClimaComms.device() isa ClimaComms.CPUMultiThreading
+        Base.@sync begin
+            launch_cuda_kernels_or_spawn_tasks!(...)
+        end
+    end
+end
+```
+
+If the CPU version of the above example does not leverage
+spawned tasks (which require using `Base.sync` or `Threads.wait`
+to synchronize), then you may want to simply use [`@cuda_sync`](@ref).
 """
 macro sync(device, expr)
     # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
@@ -191,6 +210,35 @@ macro sync(device, expr)
             $Base.@sync begin
                 $(expr)
             end
+        end
+    end)
+end
+
+"""
+    @cuda_sync device expr
+
+Device-flexible `CUDA.@sync`.
+
+Lowers to
+```julia
+expr
+```
+for CPU devices and
+```julia
+CUDA.@sync expr
+```
+for CUDA devices.
+"""
+macro cuda_sync(device, expr)
+    # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
+    return esc(quote
+        if $(device) isa $CUDADevice
+            $CUDA.@sync begin
+                $(expr)
+            end
+        else
+            @assert $(device) isa $AbstractDevice
+            $(expr)
         end
     end)
 end
