@@ -17,6 +17,7 @@ ClimaComms.CPUSingleThreading
 ClimaComms.CPUMultiThreading
 ClimaComms.CUDADevice
 ClimaComms.device
+ClimaComms.device_functional
 ClimaComms.array_type
 ClimaComms.@threaded
 ClimaComms.@time

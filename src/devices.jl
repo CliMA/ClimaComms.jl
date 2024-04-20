@@ -1,6 +1,4 @@
-# we previously used CUDA as a variable
-import CUDA
-
+import ..ClimaComms
 
 """
     AbstractDevice
@@ -39,6 +37,27 @@ Use NVIDIA GPU accelarator
 struct CUDADevice <: AbstractDevice end
 
 """
+    ClimaComms.cuda_ext_available()
+
+Returns true when the `ClimaComms` `ClimaCommsCUDAExt` extension was loaded.
+
+To load `ClimaCommsCUDAExt`, just load `ClimaComms` and `CUDA`.
+"""
+function cuda_ext_available()
+    return !isnothing(Base.get_extension(ClimaComms, :ClimaCommsCUDAExt))
+end
+
+"""
+    ClimaComms.device_functional(device)
+
+Return true when the `device` is correctly set up.
+"""
+function device_functional end
+
+device_functional(::CPUSingleThreaded) = true
+device_functional(::CPUMultiThreaded) = true
+
+"""
     ClimaComms.device()
 
 Automatically determine the appropriate device to use, returning one of
@@ -60,12 +79,13 @@ function device()
         elseif env_var == "CPUMultiThreaded"
             return CPUMultiThreaded()
         elseif env_var == "CUDA"
+            cuda_ext_available() || error("CUDA was not loaded")
             return CUDADevice()
         else
             error("Invalid CLIMACOMMS_DEVICE: $env_var")
         end
     end
-    if CUDA.functional()
+    if cuda_ext_available() && device_functional(CUDADevice())
         return CUDADevice()
     else
         return Threads.nthreads() == 1 ? CPUSingleThreaded() :
@@ -79,8 +99,13 @@ end
 The base array type used by the specified device (currently `Array` or `CuArray`).
 """
 array_type(::AbstractCPUDevice) = Array
-array_type(::CUDADevice) = CUDA.CuArray
 
+"""
+Internal function that can be used to assign a device to a process.
+
+Currently used to assign CUDADevices to MPI ranks.
+"""
+_assign_device(device, id) = nothing
 
 """
     @threaded device for ... end
@@ -128,14 +153,22 @@ CUDA.@time expr
 for CUDA devices.
 """
 macro time(device, expr)
-    return quote
-        if $(esc(device)) isa CUDADevice
-            CUDA.@time $(esc(expr))
-        else
-            @assert $(esc(device)) isa AbstractDevice
-            Base.@time $(esc(expr))
-        end
-    end
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@time $expr
+                end
+            else
+                @assert $device isa $AbstractDevice
+                $Base.@time $(expr)
+            end
+        end,
+    )
 end
 
 """
@@ -154,14 +187,22 @@ CUDA.@elapsed expr
 for CUDA devices.
 """
 macro elapsed(device, expr)
-    return quote
-        if $(esc(device)) isa CUDADevice
-            CUDA.@elapsed $(esc(expr))
-        else
-            @assert $(esc(device)) isa AbstractDevice
-            Base.@elapsed $(esc(expr))
-        end
-    end
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@elapsed $expr
+                end
+            else
+                @assert $device isa $AbstractDevice
+                $Base.@elapsed $(expr)
+            end
+        end,
+    )
 end
 
 """
@@ -200,18 +241,26 @@ to synchronize), then you may want to simply use [`@cuda_sync`](@ref).
 """
 macro sync(device, expr)
     # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
-    return esc(quote
-        if $(device) isa $CUDADevice
-            $CUDA.@sync begin
-                $(expr)
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@sync begin
+                        $(expr)
+                    end
+                end
+            else
+                @assert $device isa $AbstractDevice
+                $Base.@sync begin
+                    $(expr)
+                end
             end
-        else
-            @assert $(device) isa $AbstractDevice
-            $Base.@sync begin
-                $(expr)
-            end
-        end
-    end)
+        end,
+    )
 end
 
 """
@@ -231,14 +280,22 @@ for CUDA devices.
 """
 macro cuda_sync(device, expr)
     # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
-    return esc(quote
-        if $(device) isa $CUDADevice
-            $CUDA.@sync begin
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@sync begin
+                        $(expr)
+                    end
+                end
+            else
+                @assert $device isa $AbstractDevice
                 $(expr)
             end
-        else
-            @assert $(device) isa $AbstractDevice
-            $(expr)
-        end
-    end)
+        end,
+    )
 end

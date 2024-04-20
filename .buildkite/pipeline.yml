@@ -1,12 +1,9 @@
 agents:
-  queue: central
+  queue: new-central
   slurm_mem: 8G
-  modules: julia/1.9.3 cuda/12.2 ucx/1.14.1_cuda-12.2 openmpi/4.1.5_cuda-12.2 hdf5/1.12.2-ompi415 nsight-systems/2023.2.1
+  modules: climacommon/2024_03_18
 
 env:
-  JULIA_LOAD_PATH: "${JULIA_LOAD_PATH}:${BUILDKITE_BUILD_CHECKOUT_PATH}/.buildkite"
-  JULIA_CUDA_USE_BINARYBUILDER: false
-  JULIA_CUDA_MEMORY_POOL: none
   OPENBLAS_NUM_THREADS: 1
 
 steps:
@@ -14,12 +11,13 @@ steps:
     key: "initialize"
     command:
       - echo "--- Instantiate project"
-      - "julia --project -e 'using Pkg; Pkg.instantiate(;verbose=true); Pkg.precompile(;strict=true)'"
+      - "julia --project=test -e 'using Pkg; Pkg.develop(;path=\".\"); Pkg.add(\"CUDA\"); Pkg.add(\"MPI\"); Pkg.instantiate(;verbose=true); Pkg.precompile(;strict=true)'"
       # force the initialization of the CUDA runtime as it is lazily loaded by default
-      - "julia --project -e 'using CUDA; CUDA.precompile_runtime()'"
-      - "julia --project -e 'using Pkg; Pkg.status()'"
+      - "julia --project=test -e 'using CUDA; CUDA.precompile_runtime()'"
+      - "julia --project=test -e 'using Pkg; Pkg.status()'"
 
     agents:
+      slurm_gpus: 1
       slurm_cpus_per_task: 8
     env:
       JULIA_NUM_PRECOMPILE_TASKS: 8
@@ -29,29 +27,53 @@ steps:
   - label: ":computer: tests"
     key: "cpu_tests"
     command:
-      - julia --project -e 'using Pkg; Pkg.test()'
+      - julia --project=test test/runtests.jl
+    env:
+      CLIMACOMMS_TEST_DEVICE: CPU
+
+  - label: ":computer: tests MPI"
+    key: "cpu_tests_mpi"
+    command:
+      - srun julia --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
     agents:
-      slurm_nodes: 1
-      slurm_ntasks_per_node: 4
+      slurm_ntasks: 2
 
   - label: ":computer: threaded tests"
     key: "cpu_threaded_tests"
     command:
-      - julia --threads 8 --project -e 'using Pkg; Pkg.test()'
+      - julia --threads 4 --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
     agents:
-      slurm_cpus_per_task: 8
+      slurm_cpus_per_task: 4
+
+  - label: ":computer: threaded tests MPI"
+    key: "cpu_threaded_tests_mpi"
+    command:
+      - srun julia --threads 4 --project=test test/runtests.jl
+    env:
+      CLIMACOMMS_TEST_DEVICE: CPU
+    agents:
+      slurm_ntasks: 2
+      slurm_cpus_per_task: 4
 
   - label: ":flower_playing_cards: tests"
     key: "gpu_tests"
     command:
-      - julia --project -e 'using Pkg; Pkg.test()'
+      - julia --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
     agents:
-      slurm_nodes: 1
-      slurm_ntasks_per_node: 2
+      slurm_gpus: 1
+
+  - label: ":flower_playing_cards: tests MPI"
+    key: "gpu_tests_mpi"
+    command:
+      - srun julia --project=test test/runtests.jl
+    env:
+      CLIMACOMMS_TEST_DEVICE: CUDA
+    agents:
       slurm_gpus_per_task: 1
+      slurm_ntasks: 2
