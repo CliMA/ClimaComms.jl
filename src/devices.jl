@@ -37,17 +37,6 @@ Use NVIDIA GPU accelarator
 struct CUDADevice <: AbstractDevice end
 
 """
-    ClimaComms.cuda_ext_available()
-
-Returns true when the `ClimaComms` `ClimaCommsCUDAExt` extension was loaded.
-
-To load `ClimaCommsCUDAExt`, just load `ClimaComms` and `CUDA`.
-"""
-function cuda_ext_available()
-    return !isnothing(Base.get_extension(ClimaComms, :ClimaCommsCUDAExt))
-end
-
-"""
     ClimaComms.device_functional(device)
 
 Return true when the `device` is correctly set up.
@@ -60,36 +49,28 @@ device_functional(::CPUMultiThreaded) = true
 """
     ClimaComms.device()
 
-Automatically determine the appropriate device to use, returning one of
- - [`AbstractCPUDevice()`](@ref)
- - [`CUDADevice()`](@ref)
+Determine the device to use depending on the `CLIMACOMMS_DEVICE` environment variable.
 
-By default, it will check if a functional CUDA installation exists, using CUDA if possible.
+Allowed values:
+- `CPU`, single-threaded or multi-threaded depending on the number of threads;
+- `CPUSingleThreaded`,
+- `CPUMultiThreaded`,
+- `CUDA`.
 
-Behavior can be overridden by setting the `CLIMACOMMS_DEVICE` environment variable to either `CPU` or `CUDA`.
+The default is `CPU`.
 """
 function device()
-    env_var = get(ENV, "CLIMACOMMS_DEVICE", nothing)
-    if !isnothing(env_var)
-        if env_var == "CPU"
-            return Threads.nthreads() > 1 ? CPUMultiThreaded() :
-                   CPUSingleThreaded()
-        elseif env_var == "CPUSingleThreaded"
-            return CPUSingleThreaded()
-        elseif env_var == "CPUMultiThreaded"
-            return CPUMultiThreaded()
-        elseif env_var == "CUDA"
-            cuda_ext_available() || error("CUDA was not loaded")
-            return CUDADevice()
-        else
-            error("Invalid CLIMACOMMS_DEVICE: $env_var")
-        end
-    end
-    if cuda_ext_available() && device_functional(CUDADevice())
+    env_var = get(ENV, "CLIMACOMMS_DEVICE", "CPU")
+    if env_var == "CPU"
+        return Threads.nthreads() > 1 ? CPUMultiThreaded() : CPUSingleThreaded()
+    elseif env_var == "CPUSingleThreaded"
+        return CPUSingleThreaded()
+    elseif env_var == "CPUMultiThreaded"
+        return CPUMultiThreaded()
+    elseif env_var == "CUDA"
         return CUDADevice()
     else
-        return Threads.nthreads() == 1 ? CPUSingleThreaded() :
-               CPUMultiThreaded()
+        error("Invalid CLIMACOMMS_DEVICE: $env_var")
     end
 end
 

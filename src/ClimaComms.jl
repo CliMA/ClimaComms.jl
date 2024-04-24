@@ -15,5 +15,6 @@ include("devices.jl")
 include("context.jl")
 include("singleton.jl")
 include("mpi.jl")
+include("loading.jl")
 
 end # module

@@ -1,14 +1,24 @@
 import ..ClimaComms
 
-"""
-    ClimaComms.mpi_ext_available()
-
-Returns true when the `ClimaComms` `ClimaCommsMPIExt` extension was loaded.
-
-To load `ClimaCommsMPIExt`, just load `ClimaComms` and `MPI`.
-"""
-function mpi_ext_available()
-    return !isnothing(Base.get_extension(ClimaComms, :ClimaCommsMPIExt))
+function context_type()
+    name = get(ENV, "CLIMACOMMS_CONTEXT", nothing)
+    if !isnothing(name)
+        if name == "MPI"
+            return :MPICommsContext
+        elseif name == "SINGLETON"
+            return :SingletonCommsContext
+        else
+            error("Invalid context: $name")
+        end
+    end
+    # detect common environment variables used by MPI launchers
+    #   PMI_RANK appears to be used by MPICH and srun
+    #   OMPI_COMM_WORLD_RANK appears to be used by OpenMPI
+    if haskey(ENV, "PMI_RANK") || haskey(ENV, "OMPI_COMM_WORLD_RANK")
+        return :MPICommsContext
+    else
+        return :SingletonCommsContext
+    end
 end
 
 """
@@ -23,29 +33,9 @@ it will return a [`SingletonCommsContext`](@ref).
 Behavior can be overridden by setting the `CLIMACOMMS_CONTEXT` environment variable
 to either `MPI` or `SINGLETON`.
 """
-function context(device = device())
-    if !(mpi_ext_available())
-        return SingletonCommsContext(device)
-    else
-        name = get(ENV, "CLIMACOMMS_CONTEXT", nothing)
-        if !isnothing(name)
-            if name == "MPI"
-                return MPICommsContext()
-            elseif name == "SINGLETON"
-                return SingletonCommsContext()
-            else
-                error("Invalid context: $name")
-            end
-        end
-        # detect common environment variables used by MPI launchers
-        #   PMI_RANK appears to be used by MPICH and srun
-        #   OMPI_COMM_WORLD_RANK appears to be used by OpenMPI
-        if haskey(ENV, "PMI_RANK") || haskey(ENV, "OMPI_COMM_WORLD_RANK")
-            return MPICommsContext(device)
-        else
-            return SingletonCommsContext(device)
-        end
-    end
+function context(device = device(); target_context = context_type())
+    ContextConstructor = getproperty(ClimaComms, target_context)
+    return ContextConstructor(device)
 end
 
 """

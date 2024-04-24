@@ -8,6 +8,12 @@ CurrentModule = ClimaComms
 ClimaComms
 ```
 
+## Loading
+
+```@docs
+ClimaComms.import_required_backends
+```
+
 ## Devices
 
 ```@docs

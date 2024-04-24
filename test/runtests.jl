@@ -1,14 +1,6 @@
 using Test
 using ClimaComms
-
-if haskey(ENV, "CLIMACOMMS_TEST_DEVICE") &&
-   ENV["CLIMACOMMS_TEST_DEVICE"] == "CUDA"
-    import CUDA
-    @test ClimaComms.cuda_ext_available()
-end
-
-import MPI
-@test ClimaComms.mpi_ext_available()
+ClimaComms.@import_required_backends
 
 context = ClimaComms.context()
 pid, nprocs = ClimaComms.init(context)

@@ -37,6 +37,8 @@ steps:
       - srun julia --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
+      CLIMACOMMS_CONTEXT: MPI
+      CLIMACOMMS_DEVICE: CPU
     agents:
       slurm_ntasks: 2
 
@@ -46,6 +48,7 @@ steps:
       - julia --threads 4 --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
+      CLIMACOMMS_DEVICE: CPU
     agents:
       slurm_cpus_per_task: 4
 
@@ -55,6 +58,8 @@ steps:
       - srun julia --threads 4 --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
+      CLIMACOMMS_CONTEXT: MPI
+      CLIMACOMMS_DEVICE: CPU
     agents:
       slurm_ntasks: 2
       slurm_cpus_per_task: 4
@@ -65,6 +70,7 @@ steps:
       - julia --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
+      CLIMACOMMS_DEVICE: CUDA
     agents:
       slurm_gpus: 1
 
@@ -74,6 +80,8 @@ steps:
       - srun julia --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
+      CLIMACOMMS_CONTEXT: MPI
+      CLIMACOMMS_DEVICE: CUDA
     agents:
       slurm_gpus_per_task: 1
       slurm_ntasks: 2
