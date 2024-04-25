@@ -1,11 +1,21 @@
+import ..ClimaComms
+
 export import_required_backends
 
-function mpi_required()
+function mpi_is_required()
     return context_type() == :MPICommsContext
 end
 
-function cuda_required()
-    return device() isa CUDADevice
+function mpi_ext_is_not_loaded()
+    return isnothing(Base.get_extension(ClimaComms, :ClimaCommsMPIExt))
+end
+
+function cuda_is_required()
+    return device_type() == :CUDADevice
+end
+
+function cuda_ext_is_not_loaded()
+    return isnothing(Base.get_extension(ClimaComms, :ClimaCommsCUDAExt))
 end
 
 """
@@ -16,23 +26,13 @@ If the desired device is CUDA (as determined by `ClimaComms.device()`), try load
 """
 macro import_required_backends()
     return quote
-        @static if $mpi_required()
-            try
-                import MPI
-            catch
-                error(
-                    "Cannot load MPI.jl. Make sure it is included in your environment stack.",
-                )
-            end
+        @static if $mpi_is_required() && $mpi_ext_is_not_loaded()
+            import MPI
+            @info "Loaded MPI.jl"
         end
-        @static if $cuda_required()
-            try
-                import CUDA
-            catch
-                error(
-                    "Cannot load CUDA.jl. Make sure it is included in your environment stack.",
-                )
-            end
+        @static if $cuda_is_required() && $cuda_ext_is_not_loaded()
+            import CUDA
+            @info "Loaded CUDA.jl"
         end
     end
 end

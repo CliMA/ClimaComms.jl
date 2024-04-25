@@ -34,6 +34,11 @@ Behavior can be overridden by setting the `CLIMACOMMS_CONTEXT` environment varia
 to either `MPI` or `SINGLETON`.
 """
 function context(device = device(); target_context = context_type())
+    if target_context == :MPICommsContext && mpi_ext_is_not_loaded()
+        error(
+            "Loading MPI.jl is required to use MPICommsContext. You might want to call ClimaComms.@import_required_backends",
+        )
+    end
     ContextConstructor = getproperty(ClimaComms, target_context)
     return ContextConstructor(device)
 end

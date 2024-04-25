@@ -46,6 +46,21 @@ function device_functional end
 device_functional(::CPUSingleThreaded) = true
 device_functional(::CPUMultiThreaded) = true
 
+function device_type()
+    env_var = get(ENV, "CLIMACOMMS_DEVICE", "CPU")
+    if env_var == "CPU"
+        return Threads.nthreads() > 1 ? :CPUMultiThreaded : :CPUSingleThreaded
+    elseif env_var == "CPUSingleThreaded"
+        return :CPUSingleThreaded
+    elseif env_var == "CPUMultiThreaded"
+        return :CPUMultiThreaded
+    elseif env_var == "CUDA"
+        return :CUDADevice
+    else
+        error("Invalid CLIMACOMMS_DEVICE: $env_var")
+    end
+end
+
 """
     ClimaComms.device()
 
@@ -60,18 +75,14 @@ Allowed values:
 The default is `CPU`.
 """
 function device()
-    env_var = get(ENV, "CLIMACOMMS_DEVICE", "CPU")
-    if env_var == "CPU"
-        return Threads.nthreads() > 1 ? CPUMultiThreaded() : CPUSingleThreaded()
-    elseif env_var == "CPUSingleThreaded"
-        return CPUSingleThreaded()
-    elseif env_var == "CPUMultiThreaded"
-        return CPUMultiThreaded()
-    elseif env_var == "CUDA"
-        return CUDADevice()
-    else
-        error("Invalid CLIMACOMMS_DEVICE: $env_var")
+    target_device = device_type()
+    if target_device == :CUDADevice && cuda_ext_is_not_loaded()
+        error(
+            "Loading CUDA.jl is required to use CUDADevice. You might want to call ClimaComms.@import_required_backends",
+        )
     end
+    DeviceConstructor = getproperty(ClimaComms, target_device)
+    return DeviceConstructor()
 end
 
 """
