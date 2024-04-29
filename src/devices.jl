@@ -1,6 +1,4 @@
-# we previously used CUDA as a variable
-import CUDA
-
+import ..ClimaComms
 
 """
     AbstractDevice
@@ -39,38 +37,52 @@ Use NVIDIA GPU accelarator
 struct CUDADevice <: AbstractDevice end
 
 """
+    ClimaComms.device_functional(device)
+
+Return true when the `device` is correctly set up.
+"""
+function device_functional end
+
+device_functional(::CPUSingleThreaded) = true
+device_functional(::CPUMultiThreaded) = true
+
+function device_type()
+    env_var = get(ENV, "CLIMACOMMS_DEVICE", "CPU")
+    if env_var == "CPU"
+        return Threads.nthreads() > 1 ? :CPUMultiThreaded : :CPUSingleThreaded
+    elseif env_var == "CPUSingleThreaded"
+        return :CPUSingleThreaded
+    elseif env_var == "CPUMultiThreaded"
+        return :CPUMultiThreaded
+    elseif env_var == "CUDA"
+        return :CUDADevice
+    else
+        error("Invalid CLIMACOMMS_DEVICE: $env_var")
+    end
+end
+
+"""
     ClimaComms.device()
 
-Automatically determine the appropriate device to use, returning one of
- - [`AbstractCPUDevice()`](@ref)
- - [`CUDADevice()`](@ref)
+Determine the device to use depending on the `CLIMACOMMS_DEVICE` environment variable.
 
-By default, it will check if a functional CUDA installation exists, using CUDA if possible.
+Allowed values:
+- `CPU`, single-threaded or multi-threaded depending on the number of threads;
+- `CPUSingleThreaded`,
+- `CPUMultiThreaded`,
+- `CUDA`.
 
-Behavior can be overridden by setting the `CLIMACOMMS_DEVICE` environment variable to either `CPU` or `CUDA`.
+The default is `CPU`.
 """
 function device()
-    env_var = get(ENV, "CLIMACOMMS_DEVICE", nothing)
-    if !isnothing(env_var)
-        if env_var == "CPU"
-            return Threads.nthreads() > 1 ? CPUMultiThreaded() :
-                   CPUSingleThreaded()
-        elseif env_var == "CPUSingleThreaded"
-            return CPUSingleThreaded()
-        elseif env_var == "CPUMultiThreaded"
-            return CPUMultiThreaded()
-        elseif env_var == "CUDA"
-            return CUDADevice()
-        else
-            error("Invalid CLIMACOMMS_DEVICE: $env_var")
-        end
+    target_device = device_type()
+    if target_device == :CUDADevice && cuda_ext_is_not_loaded()
+        error(
+            "Loading CUDA.jl is required to use CUDADevice. You might want to call ClimaComms.@import_required_backends",
+        )
     end
-    if CUDA.functional()
-        return CUDADevice()
-    else
-        return Threads.nthreads() == 1 ? CPUSingleThreaded() :
-               CPUMultiThreaded()
-    end
+    DeviceConstructor = getproperty(ClimaComms, target_device)
+    return DeviceConstructor()
 end
 
 """
@@ -79,8 +91,13 @@ end
 The base array type used by the specified device (currently `Array` or `CuArray`).
 """
 array_type(::AbstractCPUDevice) = Array
-array_type(::CUDADevice) = CUDA.CuArray
 
+"""
+Internal function that can be used to assign a device to a process.
+
+Currently used to assign CUDADevices to MPI ranks.
+"""
+_assign_device(device, id) = nothing
 
 """
     @threaded device for ... end
@@ -128,14 +145,22 @@ CUDA.@time expr
 for CUDA devices.
 """
 macro time(device, expr)
-    return quote
-        if $(esc(device)) isa CUDADevice
-            CUDA.@time $(esc(expr))
-        else
-            @assert $(esc(device)) isa AbstractDevice
-            Base.@time $(esc(expr))
-        end
-    end
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@time $expr
+                end
+            else
+                @assert $device isa $AbstractDevice
+                $Base.@time $(expr)
+            end
+        end,
+    )
 end
 
 """
@@ -154,14 +179,22 @@ CUDA.@elapsed expr
 for CUDA devices.
 """
 macro elapsed(device, expr)
-    return quote
-        if $(esc(device)) isa CUDADevice
-            CUDA.@elapsed $(esc(expr))
-        else
-            @assert $(esc(device)) isa AbstractDevice
-            Base.@elapsed $(esc(expr))
-        end
-    end
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@elapsed $expr
+                end
+            else
+                @assert $device isa $AbstractDevice
+                $Base.@elapsed $(expr)
+            end
+        end,
+    )
 end
 
 """
@@ -200,18 +233,26 @@ to synchronize), then you may want to simply use [`@cuda_sync`](@ref).
 """
 macro sync(device, expr)
     # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
-    return esc(quote
-        if $(device) isa $CUDADevice
-            $CUDA.@sync begin
-                $(expr)
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@sync begin
+                        $(expr)
+                    end
+                end
+            else
+                @assert $device isa $AbstractDevice
+                $Base.@sync begin
+                    $(expr)
+                end
             end
-        else
-            @assert $(device) isa $AbstractDevice
-            $Base.@sync begin
-                $(expr)
-            end
-        end
-    end)
+        end,
+    )
 end
 
 """
@@ -231,14 +272,22 @@ for CUDA devices.
 """
 macro cuda_sync(device, expr)
     # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
-    return esc(quote
-        if $(device) isa $CUDADevice
-            $CUDA.@sync begin
+    return esc(
+        quote
+            if $device isa $CUDADevice
+                @static if isnothing(
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
+                )
+                    error("CUDA not loaded")
+                else
+                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@sync begin
+                        $(expr)
+                    end
+                end
+            else
+                @assert $device isa $AbstractDevice
                 $(expr)
             end
-        else
-            @assert $(device) isa $AbstractDevice
-            $(expr)
-        end
-    end)
+        end,
+    )
 end

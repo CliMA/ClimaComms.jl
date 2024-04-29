@@ -8,6 +8,12 @@ CurrentModule = ClimaComms
 ClimaComms
 ```
 
+## Loading
+
+```@docs
+ClimaComms.import_required_backends
+```
+
 ## Devices
 
 ```@docs
@@ -17,6 +23,7 @@ ClimaComms.CPUSingleThreading
 ClimaComms.CPUMultiThreading
 ClimaComms.CUDADevice
 ClimaComms.device
+ClimaComms.device_functional
 ClimaComms.array_type
 ClimaComms.@threaded
 ClimaComms.@time

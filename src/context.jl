@@ -1,3 +1,26 @@
+import ..ClimaComms
+
+function context_type()
+    name = get(ENV, "CLIMACOMMS_CONTEXT", nothing)
+    if !isnothing(name)
+        if name == "MPI"
+            return :MPICommsContext
+        elseif name == "SINGLETON"
+            return :SingletonCommsContext
+        else
+            error("Invalid context: $name")
+        end
+    end
+    # detect common environment variables used by MPI launchers
+    #   PMI_RANK appears to be used by MPICH and srun
+    #   OMPI_COMM_WORLD_RANK appears to be used by OpenMPI
+    if haskey(ENV, "PMI_RANK") || haskey(ENV, "OMPI_COMM_WORLD_RANK")
+        return :MPICommsContext
+    else
+        return :SingletonCommsContext
+    end
+end
+
 """
     ClimaComms.context(device=device())
 
@@ -10,25 +33,14 @@ it will return a [`SingletonCommsContext`](@ref).
 Behavior can be overridden by setting the `CLIMACOMMS_CONTEXT` environment variable
 to either `MPI` or `SINGLETON`.
 """
-function context(device = device())
-    name = get(ENV, "CLIMACOMMS_CONTEXT", nothing)
-    if !isnothing(name)
-        if name == "MPI"
-            return MPICommsContext()
-        elseif name == "SINGLETON"
-            return SingletonCommsContext()
-        else
-            error("Invalid context: $name")
-        end
+function context(device = device(); target_context = context_type())
+    if target_context == :MPICommsContext && mpi_ext_is_not_loaded()
+        error(
+            "Loading MPI.jl is required to use MPICommsContext. You might want to call ClimaComms.@import_required_backends",
+        )
     end
-    # detect common environment variables used by MPI launchers
-    #   PMI_RANK appears to be used by MPICH and srun
-    #   OMPI_COMM_WORLD_RANK appears to be used by OpenMPI
-    if haskey(ENV, "PMI_RANK") || haskey(ENV, "OMPI_COMM_WORLD_RANK")
-        return MPICommsContext(device)
-    else
-        return SingletonCommsContext(device)
-    end
+    ContextConstructor = getproperty(ClimaComms, target_context)
+    return ContextConstructor(device)
 end
 
 """
@@ -149,9 +161,9 @@ A context for communicating between processes in a graph.
 abstract type AbstractGraphContext end
 
 """
-    graph_context(context::AbstractCommsContext, 
-        sendarray, sendlengths, sendpids, 
-        recvarray, recvlengths, recvpids)
+    graph_context(context::AbstractCommsContext,
+                  sendarray, sendlengths, sendpids,
+                  recvarray, recvlengths, recvpids)
 
 Construct a communication context for exchanging neighbor data via a graph.
 
