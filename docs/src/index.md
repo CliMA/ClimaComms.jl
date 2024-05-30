@@ -11,7 +11,8 @@ ClimaComms
 ## Loading
 
 ```@docs
-ClimaComms.import_required_backends
+ClimaComms.cuda_is_required
+ClimaComms.mpi_is_required
 ```
 
 ## Devices

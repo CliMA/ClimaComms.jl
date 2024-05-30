@@ -1,6 +1,7 @@
 using Test
 using ClimaComms
-ClimaComms.@import_required_backends
+ClimaComms.cuda_is_required() && import CUDA
+ClimaComms.mpi_is_required() && import MPI
 
 context = ClimaComms.context()
 pid, nprocs = ClimaComms.init(context)

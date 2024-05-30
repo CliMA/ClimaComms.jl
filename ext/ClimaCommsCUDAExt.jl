@@ -15,4 +15,9 @@ end
 
 ClimaComms.array_type(::ClimaComms.CUDADevice) = CUDA.CuArray
 
+# Extending ClimaComms methods that operate on expressions (cannot use dispatch here)
+ClimaComms.cuda_sync(expr) = CUDA.@sync expr
+ClimaComms.cuda_time(expr) = CUDA.@time expr
+ClimaComms.cuda_elasped(expr) = CUDA.@elapsed expr
+
 end

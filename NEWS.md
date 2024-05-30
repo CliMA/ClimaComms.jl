@@ -1,6 +1,15 @@
 ClimaComms.jl Release Notes
 ========================
 
+v0.7.0
+-------
+
+- ![][badge-💥breaking] `ClimaComms.@import_required_backends` was removed, as there were code loading issues. It is now recommended to use the following code loading pattern:
+  ```julia
+  ClimaComms.cuda_is_required() && import CUDA
+  ClimaComms.mpi_is_required() && import MPI
+  ```
+
 v0.6.0
 -------
 

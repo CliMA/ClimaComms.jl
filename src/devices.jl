@@ -76,11 +76,6 @@ The default is `CPU`.
 """
 function device()
     target_device = device_type()
-    if target_device == :CUDADevice && cuda_ext_is_not_loaded()
-        error(
-            "Loading CUDA.jl is required to use CUDADevice. You might want to call ClimaComms.@import_required_backends",
-        )
-    end
     DeviceConstructor = getproperty(ClimaComms, target_device)
     return DeviceConstructor()
 end
@@ -129,6 +124,8 @@ macro threaded(device, loop)
     end
 end
 
+function cuda_time end
+
 """
     @time device expr
 
@@ -145,23 +142,18 @@ CUDA.@time expr
 for CUDA devices.
 """
 macro time(device, expr)
-    return esc(
-        quote
-            if $device isa $CUDADevice
-                @static if isnothing(
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
-                )
-                    error("CUDA not loaded")
-                else
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@time $expr
-                end
-            else
-                @assert $device isa $AbstractDevice
-                $Base.@time $(expr)
-            end
-        end,
-    )
+    CC = ClimaComms
+    return esc(quote
+        if $device isa $CUDADevice
+            $(CC).cuda_time($expr)
+        else
+            @assert $device isa $AbstractDevice
+            $Base.@time $(expr)
+        end
+    end)
 end
+
+function cuda_elasped end
 
 """
     @elapsed device expr
@@ -179,23 +171,18 @@ CUDA.@elapsed expr
 for CUDA devices.
 """
 macro elapsed(device, expr)
-    return esc(
-        quote
-            if $device isa $CUDADevice
-                @static if isnothing(
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
-                )
-                    error("CUDA not loaded")
-                else
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@elapsed $expr
-                end
-            else
-                @assert $device isa $AbstractDevice
-                $Base.@elapsed $(expr)
-            end
-        end,
-    )
+    CC = ClimaComms
+    return esc(quote
+        if $device isa $CUDADevice
+            $(CC).cuda_elasped($expr)
+        else
+            @assert $device isa $AbstractDevice
+            $Base.@elapsed $(expr)
+        end
+    end)
 end
+
+function cuda_sync end
 
 """
     @sync device expr
@@ -233,26 +220,17 @@ to synchronize), then you may want to simply use [`@cuda_sync`](@ref).
 """
 macro sync(device, expr)
     # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
-    return esc(
-        quote
-            if $device isa $CUDADevice
-                @static if isnothing(
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
-                )
-                    error("CUDA not loaded")
-                else
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@sync begin
-                        $(expr)
-                    end
-                end
-            else
-                @assert $device isa $AbstractDevice
-                $Base.@sync begin
-                    $(expr)
-                end
+    CC = ClimaComms
+    return esc(quote
+        if $device isa $CUDADevice
+            $(CC).cuda_sync($expr)
+        else
+            @assert $device isa $AbstractDevice
+            $Base.@sync begin
+                $(expr)
             end
-        end,
-    )
+        end
+    end)
 end
 
 """
@@ -272,22 +250,13 @@ for CUDA devices.
 """
 macro cuda_sync(device, expr)
     # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
-    return esc(
-        quote
-            if $device isa $CUDADevice
-                @static if isnothing(
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt),
-                )
-                    error("CUDA not loaded")
-                else
-                    $Base.get_extension($ClimaComms, :ClimaCommsCUDAExt).CUDA.@sync begin
-                        $(expr)
-                    end
-                end
-            else
-                @assert $device isa $AbstractDevice
-                $(expr)
-            end
-        end,
-    )
+    CC = ClimaComms
+    return esc(quote
+        if $device isa $CUDADevice
+            $(CC).cuda_sync($expr)
+        else
+            @assert $device isa $AbstractDevice
+            $(expr)
+        end
+    end)
 end
