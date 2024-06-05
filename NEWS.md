@@ -1,6 +1,9 @@
 ClimaComms.jl Release Notes
 ========================
 
+v0.6.1
+- Macros have been refactored to hopefully fix some code loading issues.
+
 v0.6.0
 -------
 
