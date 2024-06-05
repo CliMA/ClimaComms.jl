@@ -1,7 +1,14 @@
 ClimaComms.jl Release Notes
 ========================
 
+v0.6.2
+-------
+
+- We added a device-agnostic `allowscalar(f, ::AbstractDevice, args...; kwargs...)` to further assist in making CUDA an extension.
+
 v0.6.1
+-------
+
 - Macros have been refactored to hopefully fix some code loading issues.
 
 v0.6.0

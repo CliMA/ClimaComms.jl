@@ -265,3 +265,27 @@ macro cuda_sync(device, expr)
         end
     end)
 end
+
+"""
+    allowscalar(f, ::AbstractDevice, args...; kwargs...)
+
+Device-flexible version of `CUDA.@allowscalar`.
+
+Lowers to
+```julia
+f(args...)
+```
+for CPU devices and
+```julia
+CUDA.@allowscalar f(args...)
+```
+for CUDA devices.
+
+This is usefully written with closures via
+```julia
+allowscalar(device) do
+    f()
+end
+```
+"""
+allowscalar(f, ::AbstractDevice, args...; kwargs...) = f(args...; kwargs...)

@@ -217,3 +217,13 @@ end
     @test ClimaComms.bcast(context, AT(fill(Float64(pid), 3))) ==
           AT(fill(Float64(1), 3))
 end
+
+@testset "allowscalar" begin
+    a = AT(rand(3))
+    local x
+    ClimaComms.allowscalar(device) do
+        x = a[1]
+    end
+    device isa ClimaComms.CUDADevice && @test_throws ErrorException a[1]
+    @test x == Array(a)[1]
+end

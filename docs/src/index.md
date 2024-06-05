@@ -27,6 +27,7 @@ ClimaComms.CUDADevice
 ClimaComms.device
 ClimaComms.device_functional
 ClimaComms.array_type
+ClimaComms.allowscalar
 ClimaComms.@threaded
 ClimaComms.@time
 ClimaComms.@elapsed
