@@ -14,6 +14,8 @@ function ClimaComms.device_functional(::ClimaComms.CUDADevice)
 end
 
 ClimaComms.array_type(::ClimaComms.CUDADevice) = CUDA.CuArray
+ClimaComms.allowscalar(f, ::ClimaComms.CUDADevice, args...; kwargs...) =
+    CUDA.@allowscalar f(args...; kwargs...)
 
 # Extending ClimaComms methods that operate on expressions (cannot use dispatch here)
 ClimaComms.cuda_sync(expr) = CUDA.@sync expr
