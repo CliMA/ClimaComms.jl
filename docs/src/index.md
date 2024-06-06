@@ -28,6 +28,7 @@ ClimaComms.device
 ClimaComms.device_functional
 ClimaComms.array_type
 ClimaComms.allowscalar
+ClimaComms.fill
 ClimaComms.@threaded
 ClimaComms.@time
 ClimaComms.@elapsed

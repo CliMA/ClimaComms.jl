@@ -227,3 +227,7 @@ end
     device isa ClimaComms.CUDADevice && @test_throws ErrorException a[1]
     @test x == Array(a)[1]
 end
+
+@testset "fill" begin
+    @test ClimaComms.fill(device, 3, (2, 2)) isa AT
+end

@@ -289,3 +289,12 @@ end
 ```
 """
 allowscalar(f, ::AbstractDevice, args...; kwargs...) = f(args...; kwargs...)
+
+"""
+    fill(::AbstractDevice, value, dims...)
+
+Device-flexible version of `fill`.
+
+Calls `Base.fill` on `AbstractCPUDevice`s and `CUDA.fill` on `CUDADevice`s.
+"""
+ClimaComms.fill(::AbstractDevice, value, dims...) = Base.fill(value, dims...)
