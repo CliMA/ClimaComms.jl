@@ -129,7 +129,130 @@ macro threaded(device, loop)
     end
 end
 
-function cuda_time end
+"""
+    @time f(args...; kwargs...)
+
+Device-flexible `@time`:
+
+Calls
+```julia
+@time f(args...; kwargs...)
+```
+for CPU devices and
+```julia
+CUDA.@time f(args...; kwargs...)
+```
+for CUDA devices.
+"""
+function time(f::F, device::AbstractDevice, args...; kwargs...) where {F}
+    Base.@time begin
+        f(args...; kwargs...)
+    end
+end
+
+"""
+    elapsed(f::F, device::AbstractDevice, args...; kwargs...)
+
+Device-flexible `elapsed`.
+
+Calls
+```julia
+@elapsed f(args...; kwargs...)
+```
+for CPU devices and
+```julia
+CUDA.@elapsed f(args...; kwargs...)
+```
+for CUDA devices.
+"""
+function elapsed(f::F, device::AbstractDevice, args...; kwargs...) where {F}
+    Base.@elapsed begin
+        f(args...; kwargs...)
+    end
+end
+
+"""
+    sync(f, ::AbstractDevice, args...; kwargs...)
+
+Device-flexible function that calls `@sync`.
+
+Calls
+```julia
+@sync f(args...; kwargs...)
+```
+for CPU devices and
+```julia
+CUDA.@sync f(args...; kwargs...)
+```
+for CUDA devices.
+
+An example use-case of this might be:
+```julia
+BenchmarkTools.@benchmark begin
+    if ClimaComms.device() isa ClimaComms.CUDADevice
+        CUDA.@sync begin
+            launch_cuda_kernels_or_spawn_tasks!(...)
+        end
+    elseif ClimaComms.device() isa ClimaComms.CPUMultiThreading
+        Base.@sync begin
+            launch_cuda_kernels_or_spawn_tasks!(...)
+        end
+    end
+end
+```
+
+If the CPU version of the above example does not leverage
+spawned tasks (which require using `Base.sync` or `Threads.wait`
+to synchronize), then you may want to simply use [`cuda_sync`](@ref).
+"""
+function sync(f::F, ::AbstractDevice, args...; kwargs...) where {F}
+    Base.@sync begin
+        f(args...; kwargs...)
+    end
+end
+
+"""
+    cuda_sync(f, ::AbstractDevice, args...; kwargs...)
+
+Device-flexible function that (may) call `CUDA.@sync`.
+
+Calls
+```julia
+f(args...; kwargs...)
+```
+for CPU devices and
+```julia
+CUDA.@sync f(args...; kwargs...)
+```
+for CUDA devices.
+"""
+function cuda_sync(f::F, ::AbstractDevice, args...; kwargs...) where {F}
+    f(args...; kwargs...)
+end
+
+"""
+    allowscalar(f, ::AbstractDevice, args...; kwargs...)
+
+Device-flexible version of `CUDA.@allowscalar`.
+
+Lowers to
+```julia
+f(args...)
+```
+for CPU devices and
+```julia
+CUDA.@allowscalar f(args...)
+```
+for CUDA devices.
+
+This is usefully written with closures via
+```julia
+allowscalar(device) do
+    f()
+end
+```
+"""
+allowscalar(f, ::AbstractDevice, args...; kwargs...) = f(args...; kwargs...)
 
 """
     @time device expr
@@ -148,46 +271,8 @@ for CUDA devices.
 """
 macro time(device, expr)
     __CC__ = ClimaComms
-    return esc(quote
-        if $device isa $CUDADevice
-            $(__CC__).cuda_time($expr)
-        else
-            @assert $device isa $AbstractDevice
-            $Base.@time $(expr)
-        end
-    end)
+    return :($__CC__.time(() -> $(esc(expr)), $(esc(device))))
 end
-
-function cuda_elasped end
-
-"""
-    @elapsed device expr
-
-Device-flexible `@elapsed`.
-
-Lowers to
-```julia
-@elapsed expr
-```
-for CPU devices and
-```julia
-CUDA.@elapsed expr
-```
-for CUDA devices.
-"""
-macro elapsed(device, expr)
-    __CC__ = ClimaComms
-    return esc(quote
-        if $device isa $CUDADevice
-            $(__CC__).cuda_elasped($expr)
-        else
-            @assert $device isa $AbstractDevice
-            $Base.@elapsed $(expr)
-        end
-    end)
-end
-
-function cuda_sync end
 
 """
     @sync device expr
@@ -224,18 +309,8 @@ spawned tasks (which require using `Base.sync` or `Threads.wait`
 to synchronize), then you may want to simply use [`@cuda_sync`](@ref).
 """
 macro sync(device, expr)
-    # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
     __CC__ = ClimaComms
-    return esc(quote
-        if $device isa $CUDADevice
-            $(__CC__).cuda_sync($expr)
-        else
-            @assert $device isa $AbstractDevice
-            $Base.@sync begin
-                $(expr)
-            end
-        end
-    end)
+    return :($__CC__.sync(() -> $(esc(expr)), $(esc(device))))
 end
 
 """
@@ -254,38 +329,26 @@ CUDA.@sync expr
 for CUDA devices.
 """
 macro cuda_sync(device, expr)
-    # https://github.com/JuliaLang/julia/issues/28979#issuecomment-1756145207
     __CC__ = ClimaComms
-    return esc(quote
-        if $device isa $CUDADevice
-            $(__CC__).cuda_sync($expr)
-        else
-            @assert $device isa $AbstractDevice
-            $(expr)
-        end
-    end)
+    return :($__CC__.cuda_sync(() -> $(esc(expr)), $(esc(device))))
 end
 
 """
-    allowscalar(f, ::AbstractDevice, args...; kwargs...)
+    @elapsed device expr
 
-Device-flexible version of `CUDA.@allowscalar`.
+Device-flexible `@elapsed`.
 
 Lowers to
 ```julia
-f(args...)
+@elapsed expr
 ```
 for CPU devices and
 ```julia
-CUDA.@allowscalar f(args...)
+CUDA.@elapsed expr
 ```
 for CUDA devices.
-
-This is usefully written with closures via
-```julia
-allowscalar(device) do
-    f()
-end
-```
 """
-allowscalar(f, ::AbstractDevice, args...; kwargs...) = f(args...; kwargs...)
+macro elapsed(device, expr)
+    __CC__ = ClimaComms
+    return :($__CC__.elapsed(() -> $(esc(expr)), $(esc(device))))
+end
