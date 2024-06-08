@@ -3,23 +3,27 @@ module ClimaCommsCUDAExt
 import CUDA
 
 import ClimaComms
+import ClimaComms: CUDADevice
 
-function ClimaComms._assign_device(::ClimaComms.CUDADevice, rank_number)
+function ClimaComms._assign_device(::CUDADevice, rank_number)
     CUDA.device!(rank_number % CUDA.ndevices())
     return nothing
 end
 
-function ClimaComms.device_functional(::ClimaComms.CUDADevice)
+function ClimaComms.device_functional(::CUDADevice)
     return CUDA.functional()
 end
 
-ClimaComms.array_type(::ClimaComms.CUDADevice) = CUDA.CuArray
-ClimaComms.allowscalar(f, ::ClimaComms.CUDADevice, args...; kwargs...) =
+ClimaComms.array_type(::CUDADevice) = CUDA.CuArray
+ClimaComms.allowscalar(f, ::CUDADevice, args...; kwargs...) =
     CUDA.@allowscalar f(args...; kwargs...)
 
 # Extending ClimaComms methods that operate on expressions (cannot use dispatch here)
-ClimaComms.cuda_sync(expr) = CUDA.@sync expr
-ClimaComms.cuda_time(expr) = CUDA.@time expr
-ClimaComms.cuda_elasped(expr) = CUDA.@elapsed expr
+ClimaComms.sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =
+    CUDA.@sync f(args...; kwargs...)
+ClimaComms.time(f::F, ::CUDADevice, args...; kwargs...) where {F} =
+    CUDA.@time f(args...; kwargs...)
+ClimaComms.elapsed(f::F, ::CUDADevice, args...; kwargs...) where {F} =
+    CUDA.@elapsed f(args...; kwargs...)
 
 end
