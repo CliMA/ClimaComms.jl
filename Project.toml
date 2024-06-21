@@ -8,7 +8,7 @@ authors = [
     "Jake Bolewski <clima-software@caltech.edu>",
     "Gabriele Bozzola <gbozzola@caltech.edu>",
 ]
-version = "0.6.2"
+version = "0.6.3"
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"

@@ -1,6 +1,11 @@
 ClimaComms.jl Release Notes
 ========================
 
+v0.6.3
+-------
+
+- Bugfix: `cuda_sync` was missing in the extension and, as a result, `ClimaComms.@cuda_sync` was not actually synchronizing. We've also removed the abstract fallback, so that we instead method-error if we pass a cuda device when the cuda extension does not exist.
+
 v0.6.2
 -------
 

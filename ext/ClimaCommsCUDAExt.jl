@@ -21,6 +21,8 @@ ClimaComms.allowscalar(f, ::CUDADevice, args...; kwargs...) =
 # Extending ClimaComms methods that operate on expressions (cannot use dispatch here)
 ClimaComms.sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@sync f(args...; kwargs...)
+ClimaComms.cuda_sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =
+    CUDA.@sync f(args...; kwargs...)
 ClimaComms.time(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@time f(args...; kwargs...)
 ClimaComms.elapsed(f::F, ::CUDADevice, args...; kwargs...) where {F} =

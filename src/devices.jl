@@ -144,7 +144,7 @@ CUDA.@time f(args...; kwargs...)
 ```
 for CUDA devices.
 """
-function time(f::F, device::AbstractDevice, args...; kwargs...) where {F}
+function time(f::F, device::AbstractCPUDevice, args...; kwargs...) where {F}
     Base.@time begin
         f(args...; kwargs...)
     end
@@ -165,7 +165,7 @@ CUDA.@elapsed f(args...; kwargs...)
 ```
 for CUDA devices.
 """
-function elapsed(f::F, device::AbstractDevice, args...; kwargs...) where {F}
+function elapsed(f::F, device::AbstractCPUDevice, args...; kwargs...) where {F}
     Base.@elapsed begin
         f(args...; kwargs...)
     end
@@ -205,7 +205,7 @@ If the CPU version of the above example does not leverage
 spawned tasks (which require using `Base.sync` or `Threads.wait`
 to synchronize), then you may want to simply use [`cuda_sync`](@ref).
 """
-function sync(f::F, ::AbstractDevice, args...; kwargs...) where {F}
+function sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
     Base.@sync begin
         f(args...; kwargs...)
     end
@@ -226,7 +226,7 @@ CUDA.@sync f(args...; kwargs...)
 ```
 for CUDA devices.
 """
-function cuda_sync(f::F, ::AbstractDevice, args...; kwargs...) where {F}
+function cuda_sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
     f(args...; kwargs...)
 end
 
@@ -252,7 +252,7 @@ allowscalar(device) do
 end
 ```
 """
-allowscalar(f, ::AbstractDevice, args...; kwargs...) = f(args...; kwargs...)
+allowscalar(f, ::AbstractCPUDevice, args...; kwargs...) = f(args...; kwargs...)
 
 """
     @time device expr
