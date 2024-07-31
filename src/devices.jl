@@ -123,7 +123,7 @@ macro threaded(device, loop)
                 esc(loop.args[2]),
             ))
         else
-            @assert $(esc(device)) isa AbstractDevice
+            Base.@assert $(esc(device)) isa AbstractDevice
             $(esc(loop))
         end
     end
@@ -352,3 +352,25 @@ macro elapsed(device, expr)
     __CC__ = ClimaComms
     return :($__CC__.elapsed(() -> $(esc(expr)), $(esc(device))))
 end
+
+"""
+    @assert device cond [text]
+
+Device-flexible `@assert`.
+
+Lowers to
+```julia
+@assert cond [text]
+```
+for CPU devices and
+```julia
+CUDA.@cuassert cond [text]
+```
+for CUDA devices.
+"""
+macro assert(device, cond, text = nothing)
+    text_func = isnothing(text) ? nothing : :(() -> $(esc(text)))
+    return :($assert($(esc(device)), () -> $(esc(cond)), $text_func))
+end
+assert(::AbstractCPUDevice, cond::C, text::T) where {C, T} =
+    isnothing(text) ? (Base.@assert cond()) : (Base.@assert cond() text())

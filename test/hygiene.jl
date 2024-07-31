@@ -29,6 +29,9 @@ function test_macro_hyhiene(dev)
         sin.(AT(rand(10)))
     end
 
+    CC.@assert dev true
+    CC.@assert dev true "some message: $(true)"
+
     CC.sync(dev) do
         for i in 1:n
             sin.(AT(rand(10)))
