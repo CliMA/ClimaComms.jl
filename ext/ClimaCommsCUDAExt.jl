@@ -27,5 +27,7 @@ ClimaComms.time(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@time f(args...; kwargs...)
 ClimaComms.elapsed(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@elapsed f(args...; kwargs...)
+ClimaComms.assert(::CUDADevice, cond::C, text::T) where {C, T} =
+    isnothing(text) ? (CUDA.@cuassert cond()) : (CUDA.@cuassert cond() text())
 
 end

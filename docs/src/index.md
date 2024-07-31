@@ -31,6 +31,7 @@ ClimaComms.allowscalar
 ClimaComms.@threaded
 ClimaComms.@time
 ClimaComms.@elapsed
+ClimaComms.@assert
 ClimaComms.@sync
 ClimaComms.@cuda_sync
 ```
