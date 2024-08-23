@@ -2,7 +2,8 @@
     SingletonCommsContext(device=device())
 
 A singleton communications context, used for single-process runs.
-[`ClimaComms.CPU`](@ref) and [`ClimaComms.CUDA`](@ref) device options are currently supported.
+[`ClimaComms.AbstractCPUDevice`](@ref) and [`ClimaComms.CUDADevice`](@ref)
+device options are currently supported.
 """
 struct SingletonCommsContext{D <: AbstractDevice} <: AbstractCommsContext
     device::D
