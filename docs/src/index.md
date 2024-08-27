@@ -18,7 +18,7 @@ The two most important objects in `ClimaComms.jl` are the [`Device`](@ref
 A `Device` identifies a computing device, a piece of hardware that will be
 executing some code. The `Device`s currently implemented are
 - [`CPUSingleThreaded`](@ref), for a CPU core with a single thread;
-- [`CUDADevice`](@ref), for a single CPU core.
+- [`CUDADevice`](@ref), for a single CUDA-enabled GPU.
 
 > :warning: [`CPUMultiThreaded`](@ref) is also available, but this device is not
 > actively used or developed.
