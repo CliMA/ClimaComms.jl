@@ -20,8 +20,8 @@ executing some code. The `Device`s currently implemented are
 - [`CPUSingleThreaded`](@ref), for a CPU core with a single thread;
 - [`CUDADevice`](@ref), for a single CUDA-enabled GPU.
 
-> :warning: [`CPUMultiThreaded`](@ref) is also available, but this device is not
-> actively used or developed.
+!!! warn [`CPUMultiThreaded`](@ref) is also available, but this device is not
+    actively used or developed.
 
 `Device`s are part of [`Context`](@ref `AbstractCommsContext`)s,
 objects that contain information require for multiple `Device`s to communicate.
