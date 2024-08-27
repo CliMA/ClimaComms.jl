@@ -43,8 +43,8 @@ export CLIMACOMMS_CONTEXT="SINGLETON"
 # call/open julia as usual
 ```
 
-> Note: there might be other ways to control the device and context. Please,
-> refer to the documentation of the specific package to learn more.
+!!! note There might be other ways to control the device and context. Please,
+    refer to the documentation of the specific package to learn more.
 
 ## Running with MPI/CUDA
 
