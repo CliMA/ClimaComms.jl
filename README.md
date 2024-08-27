@@ -19,6 +19,6 @@ and `Context`es (i.e., environments for distributed computing):
 - `SingletonCommsContext`
 - `MPICommsContext`
 
-Refer to the [documentation](https://CliMA.github.io/ClimaComms.jl/dev)) for
+Refer to the [documentation](https://CliMA.github.io/ClimaComms.jl/dev) for
 more details.
 
