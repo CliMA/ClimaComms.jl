@@ -12,7 +12,12 @@ makedocs(
     clean = true,
     doctest = true,
     modules = [ClimaComms],
-    pages = Any["Home" => "index.md"],
+    pages = Any[
+        "Home" => "index.md",
+        "Developing with `ClimaComms`" => "internals.md",
+        "Frequently Asked Questions" => "faqs.md",
+        "APIs" => "apis.md",
+    ],
 )
 deploydocs(
     repo = "github.com/CliMA/ClimaComms.jl.git",
