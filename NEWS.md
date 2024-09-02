@@ -1,6 +1,18 @@
 ClimaComms.jl Release Notes
 ========================
 
+v0.6.5
+-------
+
+- Improved error message for `@import_required_backends`. Previously, the macro
+  would just return the julia `ArgumentError: Package MPI not found in current
+  path.` Now, it points users on what steps they might want to take.
+
+v0.6.4
+-------
+
+- Added device-agnostic `assert`
+
 v0.6.3
 -------
 
