@@ -204,3 +204,13 @@ data received from all neighbors will be available in the stage areas of
 each neighbor's receive buffer.
 """
 function finish end
+
+
+Base.summary(io::IO, ctx::AbstractCommsContext) =
+    Base.summary(io, device(ctx))
+
+function Base.summary(io::IO, ctx::AbstractCommsContext, device::AbstractCPUDevice)
+    println(io, "context: $ctx")
+    println(io, "device: $device")
+end
+
