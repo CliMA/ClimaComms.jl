@@ -20,7 +20,8 @@ executing some code. The `Device`s currently implemented are
 - [`CPUSingleThreaded`](@ref), for a CPU core with a single thread;
 - [`CUDADevice`](@ref), for a single CUDA-enabled GPU.
 
-!!! warn [`CPUMultiThreaded`](@ref) is also available, but this device is not
+!!! warn
+    [`CPUMultiThreaded`](@ref) is also available, but this device is not
     actively used or developed.
 
 `Device`s are part of [`Context`](@ref `AbstractCommsContext`)s,
@@ -43,7 +44,8 @@ export CLIMACOMMS_CONTEXT="SINGLETON"
 # call/open julia as usual
 ```
 
-!!! note There might be other ways to control the device and context. Please,
+!!! note
+    There might be other ways to control the device and context. Please,
     refer to the documentation of the specific package to learn more.
 
 ## Running with MPI/CUDA
