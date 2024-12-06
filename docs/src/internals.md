@@ -8,8 +8,8 @@ First, we will describe what `Device`s and `Context`s are.
 
 `Device`s identify a specific type of computing hardware (e.g., a CPU/a NVidia
 GPU, et cetera). The `Device`s implemented are
-- [`CPUSingleThreaded`](@ref), for a CPU core with a single thread;
-- [`CUDADevice`](@ref), for a single CUDA GPU.
+- [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded), for a CPU core with a single thread;
+- [`CUDADevice`](@ref ClimaComms.CUDADevice), for a single CUDA GPU.
 
 `Device`s in `ClimaComms` are
 [singletons](https://docs.julialang.org/en/v1/manual/types/#man-singleton-types),
@@ -42,7 +42,7 @@ Low-level `CliMA` code often needs to implement different methods for different
 this level of specialization is often not required at higher levels.
 
 Higher-level code often interacts with `Device`s through `ClimaComms` functions
-such [`time`](@ref) or [`sync`](@ref). These functions implement device-agnostic
+such [`time`](@ref ClimaComms.@time) or [`sync`](@ref ClimaComms.@sync). These functions implement device-agnostic
 operations. For instance, the proper way to compute how long a given expression takes to compute is
 ```julia
 import ClimaComms: @time
@@ -59,15 +59,15 @@ For a complete list of such functions, consult the [APIs](@ref) page.
 ### `Context`s
 
 A `Context` contains the information needed for multiple devices to communicate.
-For simulations with only one device, [`SingletonCommsContext`](@ref) simply
-contains an instance of an [`AbstractDevice`](@ref). For `MPI` simulations, the
+For simulations with only one device, [`SingletonCommsContext`](@ref ClimaComms.SingletonCommsContext) simply
+contains an instance of an [`AbstractDevice`](@ref ClimaComms.AbstractDevice). For `MPI` simulations, the
 context contains the MPI communicator as well.
 
 `Context`s specify devices and form of parallelism, so they are often passed
 around in both low-level and higher-level code.
 
 `ClimaComms` provide functions that are context-agnostic. For instance,
-[`reduce`](@ref) applies a given function to an array across difference
+[`reduce`](@ref ClimaComms.reduce) applies a given function to an array across difference
 processes and collects the result. Let us see an example
 ```julia
 import ClimaComms
@@ -86,12 +86,12 @@ reduced_array = ClimaComms.reduce(context, my_array, +)
 ClimaComms.iamroot(context) && @show reduced_array
 ```
 
-[`@import_required_backends`](@ref) is responsible for loading relevant
+[`@import_required_backends`](@ref ClimaComms.@import_required_backends) is responsible for loading relevant
 libraries, for more information refer to the [Backends and extensions](@ref)
 section.
 
 In this snippet, we obtained the default context from environment variables
-using the [`context`](@ref) function. As developers, we do not know whether this
+using the [`context`](@ref ClimaComms.context) function. As developers, we do not know whether this
 code is being run on a single process or multiple, so took the more generic
 stance that the code _might_ be run on several processes. When several processes
 are being used, the same code is being run by parallel Julia instances, each
@@ -103,9 +103,9 @@ relevant.
 
 In this example, we used `mypid` to set up `my_array` in such a way that it
 would be different on different processes. We set up the array with `ArrayType`,
-obtained with [`array_type`](@ref). This function provides the type to allocate
-the array on the correct device (CPU or GPU). Then, we applied [`reduce`](@ref)
-to sum them all. [`reduce`](@ref) collects the result to the _root_ process, the
+obtained with [`array_type`](@ref ClimaComms.array_type). This function provides the type to allocate
+the array on the correct device (CPU or GPU). Then, we applied [`reduce`](@ref ClimaComms.reduce)
+to sum them all. [`reduce`](@ref ClimaComms.reduce) collects the result to the _root_ process, the
 one with `pid = 1`. For single-process runs, the only process is also a root
 process.
 
@@ -130,7 +130,7 @@ package is required but not loaded and warn you about it.
 Using non-trivial backends might require you to install `CUDA.jl` and/or
 `MPI.jl` in your environment.
 
-> Note: When using [`context`](@ref) to select the context, it is safe to always
+> Note: When using [`context`](@ref ClimaComms.context) to select the context, it is safe to always
 > add [`ClimaComms.@import_required_backends`](@ref) at the top of your scripts.
 > *Do not add* [`ClimaComms.@import_required_backends`](@ref) to library code
 > (i.e., in `src`) because the macro requires dependencies that should not be
