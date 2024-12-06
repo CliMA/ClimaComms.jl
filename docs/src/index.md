@@ -13,27 +13,28 @@ implemented, the [APIs](@ref) page collects all of them.
 ## `Device`s and `Context`s
 
 The two most important objects in `ClimaComms.jl` are the [`Device`](@ref
-`AbstractDevice`) and the [`Context`](@ref `AbstractCommsContext`).
+ClimaComms.AbstractDevice) and the [`Context`](@ref ClimaComms.AbstractCommsContext).
 
 A `Device` identifies a computing device, a piece of hardware that will be
 executing some code. The `Device`s currently implemented are
-- [`CPUSingleThreaded`](@ref), for a CPU core with a single thread;
-- [`CUDADevice`](@ref), for a single CUDA-enabled GPU.
+- [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded), for a CPU core with a single thread;
+- [`CUDADevice`](@ref ClimaComms.CUDADevice), for a single CUDA-enabled GPU.
 
-!!! warn [`CPUMultiThreaded`](@ref) is also available, but this device is not
+!!! warn
+    [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded) is also available, but this device is not
     actively used or developed.
 
-`Device`s are part of [`Context`](@ref `AbstractCommsContext`)s,
+`Device`s are part of [`Context`](@ref ClimaComms.AbstractCommsContext)s,
 objects that contain information require for multiple `Device`s to communicate.
 Implemented `Context`s are
-- [`SingletonCommsContext`](@ref), when there is no parallelism;
-- [`MPICommsContext`](@ref), for a MPI-parallelized runs.
+- [`SingletonCommsContext`](@ref ClimaComms.SingletonCommsContext), when there is no parallelism;
+- [`MPICommsContext`](@ref ClimaComms.MPICommsContext) , for a MPI-parallelized runs.
 
 To choose a device and a context, most `CliMA` packages use the
-[`device()`](@ref) and [`context()`](@ref) functions. These functions look at
+[`device()`](@ref ClimaComms.device()) and [`context()`](@ref ClimaComms.context()) functions. These functions look at
 specific environment variables and set the `device` and `context` accordingly.
-By default, the [`CPUSingleThreaded`](@ref) device is chosen and the context is
-set to [`SingletonCommsContext`](@ref) unless `ClimaComms` detects being run in
+By default, the [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded) device is chosen and the context is
+set to [`SingletonCommsContext`](@ref ClimaComms.SingletonCommsContext) unless `ClimaComms` detects being run in
 a standard MPI launcher (as `srun` or `mpiexec`).
 
 For example, to run a simulation on a GPU, run `julia` as
@@ -43,7 +44,8 @@ export CLIMACOMMS_CONTEXT="SINGLETON"
 # call/open julia as usual
 ```
 
-!!! note There might be other ways to control the device and context. Please,
+!!! note
+    There might be other ways to control the device and context. Please,
     refer to the documentation of the specific package to learn more.
 
 ## Running with MPI/CUDA
