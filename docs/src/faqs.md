@@ -16,7 +16,35 @@ in your shell (outside of Julia, no spaces).
 ## My simulation does not start and crashes with a `MPI` error. I don't want to run with `MPI`. What should I do?
 
 `ClimaComms` tries to be smart and select the best configuration for your run.
-Sometimes, it fails. In this case, you can force `ClimaComms` to ignore `MPI`
+Sometimes, it fails with an error message like the following.
+```
+cmd=init pmi_version=2 pmi_subversion=0
+--------------------------------------------------------------------------
+PMI2_Init failed to intialize.  Return code: 14
+--------------------------------------------------------------------------
+--------------------------------------------------------------------------
+The application appears to have been direct launched using "srun",
+but OMPI was not built with SLURM's PMI support and therefore cannot
+execute. There are several options for building PMI support under
+SLURM, depending upon the SLURM version you are using:
+
+  version 16.05 or later: you can use SLURM's PMIx support. This
+  requires that you configure and build SLURM --with-pmix.
+
+  Versions earlier than 16.05: you must use either SLURM's PMI-1 or
+  PMI-2 support. SLURM builds PMI-1 by default, or you can manually
+  install PMI-2. You must then build Open MPI using --with-pmi pointing
+  to the SLURM PMI library location.
+
+Please configure as appropriate and try again.
+--------------------------------------------------------------------------
+*** An error occurred in MPI_Init_thread
+*** on a NULL communicator
+*** MPI_ERRORS_ARE_FATAL (processes in this communicator will now abort,
+***    and potentially your MPI job)
+```
+
+In this case, you can force `ClimaComms` to ignore `MPI`
 with
 ```julia
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
