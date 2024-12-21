@@ -271,4 +271,30 @@ function ClimaComms.finish(
     MPI.Waitall(ghost.send_reqs)
 end
 
+import Logging: Info
+# Adapted from Logging.ConsoleLogger
+# https://docs.julialang.org/en/v1/stdlib/Logging/#AbstractLogger-interface
+# https://github.com/JuliaLang/julia/blob/5e9a32e7af2837e677e60543d4a15faa8d3a7297/base/logging/ConsoleLogger.jl
+
+function ClimaComms.MPILogger(
+    stream_generator,
+    min_level = Info;
+    meta_formatter = ClimaComms.mpi_metafmt,
+    show_limited = true,
+    ctx = ClimaComms.MPICommsContext(),
+)
+
+    !MPI.Initialized() && error("MPI must be initialized to use the MPILogger.")
+
+    stream = stream_generator(ClimaComms.mypid(ctx))
+    return ClimaComms.MPILogger(
+        stream,
+        min_level,
+        meta_formatter,
+        show_limited,
+        ctx,
+        rank,
+    )
+end
+
 end
