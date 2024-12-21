@@ -227,3 +227,7 @@ end
     device isa ClimaComms.CUDADevice && @test_throws ErrorException a[1]
     @test x == Array(a)[1]
 end
+
+@testset "logging" begin
+    include("logging.jl")
+end
