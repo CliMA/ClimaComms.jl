@@ -6,6 +6,13 @@ import ClimaComms
 ClimaComms.MPICommsContext(device = ClimaComms.device()) =
     ClimaComms.MPICommsContext(device, MPI.COMM_WORLD)
 
+ClimaComms.local_communicator(ctx::ClimaComms.MPICommsContext) =
+    MPI.Comm_split_type(
+        ctx.mpicomm,
+        MPI.COMM_TYPE_SHARED,
+        MPI.Comm_rank(ctx.mpicomm),
+    )
+
 function ClimaComms.init(ctx::ClimaComms.MPICommsContext)
     if !MPI.Initialized()
         MPI.Init()
@@ -18,11 +25,7 @@ function ClimaComms.init(ctx::ClimaComms.MPICommsContext)
             )
         end
         # assign GPUs based on local rank
-        local_comm = MPI.Comm_split_type(
-            ctx.mpicomm,
-            MPI.COMM_TYPE_SHARED,
-            MPI.Comm_rank(ctx.mpicomm),
-        )
+        local_comm = ClimaComms.local_communicator(ctx)
         ClimaComms._assign_device(ctx.device, MPI.Comm_rank(local_comm))
         MPI.free(local_comm)
     end
@@ -269,6 +272,39 @@ function ClimaComms.finish(
     # ensure that sends have completed
     # TODO: these could be moved to start()? but we would need to add a finalizer to make sure they complete.
     MPI.Waitall(ghost.send_reqs)
+end
+
+function Base.summary(io::IO, ctx::ClimaComms.MPICommsContext)
+    if !MPI.Initialized()
+        ClimaComms.iamroot(ctx) && @warn "MPI is not initialized."
+        return nothing
+    end
+    ClimaComms.barrier(ctx)
+
+    if ClimaComms.iamroot(ctx)
+        println(io, "Context: $(typeof(ctx).name.name)")
+        println(io, "Device: $(typeof(ctx.device))")
+        println(io, "Total Processes: $(ClimaComms.nprocs(ctx))")
+    end
+
+    ClimaComms.barrier(ctx)
+    rank = MPI.Comm_rank(ctx.mpicomm)
+    node_name = MPI.Get_processor_name()
+
+    if ctx.device isa ClimaComms.CUDADevice
+        local_comm = ClimaComms.local_communicator(ctx)
+        local_rank = MPI.Comm_rank(local_comm)
+        local_size = MPI.Comm_size(local_comm)
+        dev_summary = ClimaComms.device_summary(ctx.device)
+        println(
+            io,
+            "Rank: $rank, Local Rank: $local_rank, Node: $node_name, Device: $dev_summary",
+        )
+
+        MPI.free(local_comm)
+    else
+        println(io, "Rank: $rank, Node: $node_name")
+    end
 end
 
 end
