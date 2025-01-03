@@ -12,3 +12,17 @@ struct MPICommsContext{D <: AbstractDevice, C} <: AbstractCommsContext
 end
 
 function MPICommsContext end
+
+"""
+    local_communicator(ctx::MPICommsContext)
+
+Internal function to create a new MPI communicator for processes on the same physical node.
+
+Sample Usage:
+```
+ClimaComms.local_communicator(ctx) do local_comm
+    ClimaComms._assign_device(ctx.device, MPI.Comm_rank(local_comm))
+end
+```
+"""
+function local_communicator end

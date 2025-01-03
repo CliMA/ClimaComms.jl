@@ -86,6 +86,15 @@ function device()
 end
 
 """
+    device_summary(device)
+
+Return the device type. If using a CUDADevice, return device information and UUID.
+
+Internal function, used with `Base.summary(context)`
+"""
+device_summary(device) = device_type()
+
+"""
     ClimaComms.array_type(::AbstractDevice)
 
 The base array type used by the specified device (currently `Array` or `CuArray`).

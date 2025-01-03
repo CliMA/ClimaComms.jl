@@ -49,3 +49,9 @@ graph_context(ctx::SingletonCommsContext, args...) = SingletonGraphContext(ctx)
 start(gctx::SingletonGraphContext) = nothing
 progress(gctx::SingletonGraphContext) = nothing
 finish(gctx::SingletonGraphContext) = nothing
+
+function Base.summary(io::IO, ctx::SingletonCommsContext)
+    # Use .name.name to get the unparameterized context type
+    println(io, "Context: $(typeof(ctx).name.name)")
+    println(io, "Device: $(typeof(ctx.device))")
+end
