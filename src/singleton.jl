@@ -49,3 +49,8 @@ graph_context(ctx::SingletonCommsContext, args...) = SingletonGraphContext(ctx)
 start(gctx::SingletonGraphContext) = nothing
 progress(gctx::SingletonGraphContext) = nothing
 finish(gctx::SingletonGraphContext) = nothing
+
+function Base.summary(io::IO, ctx::SingletonCommsContext)
+    println(io, "Context: $(nameof(typeof(ctx)))")
+    println(io, "Device: $(typeof(ctx.device))")
+end

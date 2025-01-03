@@ -38,3 +38,23 @@ end
         @test occursin(test_str, log_content)
     end
 end
+
+io = IOBuffer()
+summary(io, ctx)
+summary_str = String(take!(io))
+print(summary_str)
+
+@testset "ClimaComms Summary Tests" begin
+    if ClimaComms.iamroot(ctx)
+        @test contains(summary_str, string(nameof(typeof(ctx))))
+        @test contains(summary_str, string(nameof(typeof(ctx.device))))
+    end
+
+    if ctx isa ClimaComms.MPICommsContext
+        @testset "MPI Context Tests" begin
+            ClimaComms.iamroot(ctx) &&
+                @test contains(summary_str, "Total Processes: $nprocs")
+            @test contains(summary_str, "Rank: $(pid-1)")
+        end
+    end
+end
