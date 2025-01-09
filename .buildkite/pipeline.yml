@@ -11,7 +11,7 @@ steps:
     key: "initialize"
     command:
       - echo "--- Instantiate project"
-      - "julia --project=test -e 'using Pkg; Pkg.develop(;path=\".\"); Pkg.add(\"CUDA\"); Pkg.add(\"MPI\"); Pkg.instantiate(;verbose=true); Pkg.precompile(;strict=true)'"
+      - julia --project=test -e 'using Pkg; Pkg.develop(;path="."); Pkg.add("CUDA"); Pkg.add("MPI"); Pkg.instantiate(;verbose=true); Pkg.precompile(;strict=true)'
       # force the initialization of the CUDA runtime as it is lazily loaded by default
       - "julia --project=test -e 'using CUDA; CUDA.precompile_runtime()'"
       - "julia --project=test -e 'using Pkg; Pkg.status()'"
