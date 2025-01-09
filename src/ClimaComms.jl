@@ -16,6 +16,7 @@ include("context.jl")
 include("singleton.jl")
 include("mpi.jl")
 include("loading.jl")
+include("adapt.jl")
 include("logging.jl")
 
 end # module

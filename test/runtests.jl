@@ -228,6 +228,35 @@ end
     @test x == Array(a)[1]
 end
 
+import Adapt
+@testset "Adapt" begin
+    @test Adapt.adapt(Array, ClimaComms.CUDADevice()) ==
+          ClimaComms.CPUSingleThreaded()
+    @static if ClimaComms.device() isa ClimaComms.CUDADevice
+        @test Adapt.adapt(Array, ClimaComms.CUDADevice()) ==
+              ClimaComms.CPUSingleThreaded()
+        @test Adapt.adapt(CUDA.CuArray, ClimaComms.CUDADevice()) ==
+              ClimaComms.CUDADevice()
+        @test Adapt.adapt(CUDA.CuArray, ClimaComms.CPUSingleThreaded()) ==
+              ClimaComms.CUDADevice()
+    end
+
+    @test Adapt.adapt(Array, ClimaComms.context(ClimaComms.CUDADevice())) ==
+          ClimaComms.context(ClimaComms.CPUSingleThreaded())
+    @static if ClimaComms.device() isa ClimaComms.CUDADevice
+        @test Adapt.adapt(Array, ClimaComms.context(ClimaComms.CUDADevice())) ==
+              ClimaComms.context(ClimaComms.CPUSingleThreaded())
+        @test Adapt.adapt(
+            CUDA.CuArray,
+            ClimaComms.context(ClimaComms.CUDADevice()),
+        ) == ClimaComms.context(ClimaComms.CUDADevice())
+        @test Adapt.adapt(
+            CUDA.CuArray,
+            ClimaComms.context(ClimaComms.CPUSingleThreaded()),
+        ) == ClimaComms.context(ClimaComms.CUDADevice())
+    end
+end
+
 @testset "logging" begin
     include("logging.jl")
 end

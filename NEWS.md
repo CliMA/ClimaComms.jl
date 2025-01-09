@@ -1,6 +1,22 @@
 ClimaComms.jl Release Notes
 ========================
 
+main
+-------
+
+v0.6.5
+-------
+
+- Support for adapt was added, so that users can convert between CPU and GPU
+  devices, and contexts containing cpu and gpu devices [PR 103](https://github.com/CliMA/ClimaComms.jl/pull/103).
+
+- New MPI logging tools were added, `MPIFileLogger` and `MPILogger` [PR 100](https://github.com/CliMA/ClimaComms.jl/pull/100).
+
+v0.6.4
+-------
+
+- Add device-flexible `@assert` was added [PR 86](https://github.com/CliMA/ClimaComms.jl/pull/86).
+
 v0.6.3
 -------
 
