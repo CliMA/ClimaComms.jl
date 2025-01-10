@@ -38,3 +38,29 @@ end
         @test occursin(test_str, log_content)
     end
 end
+
+io = IOBuffer()
+summary(io, ctx)
+summary_str = String(take!(io))
+print(summary_str)
+
+@testset "ClimaComms Summary Tests" begin
+    # Use .name.name to get the unparameterized context type
+    if ClimaComms.iamroot(ctx)
+        @test contains(summary_str, string(typeof(ctx).name.name))
+        @test contains(summary_str, string(typeof(ctx.device).name.name))
+    end
+
+    if ctx isa ClimaComms.MPICommsContext
+        @testset "MPI Context Tests" begin
+
+            if ctx.device isa ClimaComms.CUDADevice
+                @test contains(summary_str, "CUDA.CuDevice")
+            end
+
+            ClimaComms.iamroot(ctx) &&
+                @test contains(summary_str, "Total Processes: $nprocs")
+            @test contains(summary_str, "Rank: $(pid-1)")
+        end
+    end
+end

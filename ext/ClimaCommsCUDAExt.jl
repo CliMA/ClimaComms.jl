@@ -11,6 +11,12 @@ function ClimaComms._assign_device(::CUDADevice, rank_number)
     return nothing
 end
 
+function ClimaComms.device_summary(::CUDADevice)
+    dev = CUDA.device()
+    uuid = CUDA.uuid(dev)
+    return "$dev ($uuid)"
+end
+
 function ClimaComms.device_functional(::CUDADevice)
     return CUDA.functional()
 end
