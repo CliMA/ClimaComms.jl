@@ -34,6 +34,7 @@ ClimaComms.@elapsed
 ClimaComms.@assert
 ClimaComms.@sync
 ClimaComms.@cuda_sync
+Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractDevice)
 ```
 
 ## Contexts
@@ -45,6 +46,7 @@ ClimaComms.MPICommsContext
 ClimaComms.AbstractGraphContext
 ClimaComms.context
 ClimaComms.graph_context
+Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractCommsContext)
 ```
 
 ## Context operations

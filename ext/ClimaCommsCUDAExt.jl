@@ -2,6 +2,7 @@ module ClimaCommsCUDAExt
 
 import CUDA
 
+import Adapt
 import ClimaComms
 import ClimaComms: CUDADevice
 
@@ -13,6 +14,18 @@ end
 function ClimaComms.device_functional(::CUDADevice)
     return CUDA.functional()
 end
+
+function Adapt.adapt_structure(
+    to::Type{<:CUDA.CuArray},
+    ctx::ClimaComms.AbstractCommsContext,
+)
+    return ClimaComms.context(Adapt.adapt(to, ClimaComms.device(ctx)))
+end
+
+Adapt.adapt_structure(
+    ::Type{<:CUDA.CuArray},
+    device::ClimaComms.AbstractDevice,
+) = ClimaComms.CUDADevice()
 
 ClimaComms.array_type(::CUDADevice) = CUDA.CuArray
 ClimaComms.allowscalar(f, ::CUDADevice, args...; kwargs...) =
