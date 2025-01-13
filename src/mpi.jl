@@ -21,7 +21,7 @@ Internal function to create a new MPI communicator for processes on the same phy
 Sample Usage:
 ```
 ClimaComms.local_communicator(ctx) do local_comm
-    ClimaComms._assign_device(ctx.device, MPI.Comm_rank(local_comm))
+    ClimaComms._assign_device(ClimaComms.device(ctx), MPI.Comm_rank(local_comm))
 end
 ```
 """

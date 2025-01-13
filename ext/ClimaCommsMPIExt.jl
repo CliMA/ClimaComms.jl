@@ -1,5 +1,6 @@
 module ClimaCommsMPIExt
 
+import Logging
 import MPI
 import ClimaComms
 
@@ -33,9 +34,10 @@ end
 function ClimaComms.init(ctx::ClimaComms.MPICommsContext)
     if !MPI.Initialized()
         MPI.Init()
+        Logging.global_logger(ClimaComms.OnlyRootLogger(ctx))
     end
     # TODO: Generalize this to arbitrary accelerators
-    if ctx.device isa ClimaComms.CUDADevice
+    if ClimaComms.device(ctx) isa ClimaComms.CUDADevice
         if !MPI.has_cuda()
             error(
                 "MPI implementation is not built with CUDA-aware interface. If your MPI is not OpenMPI, you have to set JULIA_MPI_HAS_CUDA to `true`",
@@ -43,7 +45,10 @@ function ClimaComms.init(ctx::ClimaComms.MPICommsContext)
         end
         # assign GPUs based on local rank
         ClimaComms.local_communicator(ctx) do local_comm
-            ClimaComms._assign_device(ctx.device, MPI.Comm_rank(local_comm))
+            ClimaComms._assign_device(
+                ClimaComms.device(ctx),
+                MPI.Comm_rank(local_comm),
+            )
         end
     end
     return ClimaComms.mypid(ctx), ClimaComms.nprocs(ctx)
@@ -300,7 +305,7 @@ function Base.summary(io::IO, ctx::ClimaComms.MPICommsContext)
 
     if ClimaComms.iamroot(ctx)
         println(io, "Context: $(nameof(typeof(ctx)))")
-        println(io, "Device: $(typeof(ctx.device))")
+        println(io, "Device: $(typeof(ClimaComms.device(ctx)))")
         println(io, "Total Processes: $(ClimaComms.nprocs(ctx))")
     end
 
@@ -308,11 +313,11 @@ function Base.summary(io::IO, ctx::ClimaComms.MPICommsContext)
     rank = MPI.Comm_rank(ctx.mpicomm)
     node_name = MPI.Get_processor_name()
 
-    if ctx.device isa ClimaComms.CUDADevice
+    if ClimaComms.device(ctx) isa ClimaComms.CUDADevice
         ClimaComms.local_communicator(ctx) do local_comm
             local_rank = MPI.Comm_rank(local_comm)
             local_size = MPI.Comm_size(local_comm)
-            dev_summary = summary(io, ctx.device)
+            dev_summary = summary(io, ClimaComms.device(ctx))
             println(
                 io,
                 "Rank: $rank, Local Rank: $local_rank, Node: $node_name, Device: $dev_summary",
