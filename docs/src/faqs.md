@@ -67,3 +67,15 @@ that you can add at the top of your scripts to automatically load the required
 packages when needed. Note, the packages have to be in your Julia environment,
 so you might install packages like ` MPI.jl` and `CUDA.jl`.
 
+## How can I see the MPI state and verify that MPI is set up correctly?
+
+To inspect the current MPI state, use the `summary` function: `print(summary(context))`
+
+The output varies depending on your communication context type:
+
+- `SingletonCommsContext`: Displays basic context information and device type
+- `MPICommsContext`: Shows detailed information including each node's rank.
+
+When using GPU acceleration with `CUDADevice`, the summary additionally includes the device type and UUID.
+
+To test that MPI and CUDA are set up correctly, see [this guide](https://github.com/CliMA/slurm-buildkite?tab=readme-ov-file#testing-cuda-and-mpi-modules).
