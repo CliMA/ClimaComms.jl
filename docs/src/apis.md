@@ -49,6 +49,15 @@ ClimaComms.graph_context
 Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractCommsContext)
 ```
 
+## Logging
+
+```@docs
+ClimaComms.default_logger
+ClimaComms.enable_root_logger
+ClimaComms.MPILogger
+ClimaComms.MPIFileLogger
+```
+
 ## Context operations
 
 ```@docs

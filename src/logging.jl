@@ -3,6 +3,32 @@ import Logging, LoggingExtras
 export MPILogger, MPIFileLogger
 
 """
+    default_logger()
+    default_logger(ctx::AbstractCommsContext)
+
+Return the default logger for the given context. If no context is passed, obtain the default context.
+
+Passing an MPICommsContext will return the `MPILogger`.
+Any other context will return the default `ConsoleLogger`.
+"""
+default_logger() = default_logger(context())
+default_logger(ctx::MPICommsContext) = MPILogger(ctx)
+default_logger(ctx::AbstractCommsContext) = Logging.ConsoleLogger(stdout)
+
+"""
+    enable_root_logger(logger)
+
+Only log messages from the root process for the given `logger`.
+"""
+function enable_root_logger(logger)
+    if ClimaComms.iamroot(comms_ctx)
+        Logging.global_logger(logger)
+    else
+        Logging.global_logger(Logging.NullLogger())
+    end
+end
+
+"""
     MPILogger(context::AbstractCommsContext)
     MPILogger(iostream, context)
     
