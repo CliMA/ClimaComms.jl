@@ -85,6 +85,8 @@ function device()
     return DeviceConstructor()
 end
 
+Base.summary(io::IO, device::AbstractDevice) = string(device_type())
+
 """
     ClimaComms.array_type(::AbstractDevice)
 
