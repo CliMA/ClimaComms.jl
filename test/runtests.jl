@@ -257,6 +257,6 @@ import Adapt
     end
 end
 
-@testset "logging" begin
+@testset "Logging" begin
     include("logging.jl")
 end

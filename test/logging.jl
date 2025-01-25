@@ -1,17 +1,26 @@
 import ClimaComms, MPI
-using Logging, Test
+using Logging, Test, LoggingExtras
 
 ctx = ClimaComms.context()
 (mypid, nprocs) = ClimaComms.init(ctx)
 
-@testset "MPIFileLogger" begin
-    log_dir = mktempdir()
-    logger = ClimaComms.MPIFileLogger(ctx, log_dir)
-    with_logger(logger) do
-        test_str = "Test message from rank $mypid"
-        @info test_str
-        log_content = read(joinpath(log_dir, "rank_$mypid.log"), String)
-        @test occursin(test_str, log_content)
+@testset "FileLogger" begin
+    ClimaComms.with_tempdir(ctx) do log_dir
+        io = IOBuffer()
+        logger = ClimaComms.FileLogger(io, ctx, log_dir)
+        fname = ClimaComms.iamroot(ctx) ? "output.log" : "logs/rank_$mypid.log"
+        with_logger(logger) do
+            test_str = "Test message from rank $mypid"
+            @info test_str
+            log_content = read(joinpath(log_dir, fname), String)
+            @test occursin(test_str, log_content)
+            # Test writing to IOBuffer
+            if ClimaComms.iamroot(ctx)
+                @test occursin(test_str, String(take!(io)))
+            else
+                @test isempty(String(take!(io)))
+            end
+        end
     end
 end
 
@@ -39,6 +48,16 @@ end
     end
 end
 
+@testset "OnlyRootLogger" begin
+    logger = ClimaComms.OnlyRootLogger(ctx)
+    @test typeof(ClimaComms.OnlyRootLogger()) == typeof(logger)
+    if ClimaComms.iamroot(ctx)
+        @test logger isa Logging.ConsoleLogger
+    else
+        @test logger isa Logging.NullLogger
+    end
+end
+
 io = IOBuffer()
 summary(io, ctx)
 summary_str = String(take!(io))
@@ -47,14 +66,17 @@ print(summary_str)
 @testset "ClimaComms Summary Tests" begin
     if ClimaComms.iamroot(ctx)
         @test contains(summary_str, string(nameof(typeof(ctx))))
-        @test contains(summary_str, string(nameof(typeof(ctx.device))))
+        @test contains(
+            summary_str,
+            string(nameof(typeof(ClimaComms.device(ctx)))),
+        )
     end
 
     if ctx isa ClimaComms.MPICommsContext
         @testset "MPI Context Tests" begin
             ClimaComms.iamroot(ctx) &&
                 @test contains(summary_str, "Total Processes: $nprocs")
-            @test contains(summary_str, "Rank: $(pid-1)")
+            @test contains(summary_str, "Rank: $(mypid-1)")
         end
     end
 end

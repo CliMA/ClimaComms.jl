@@ -52,5 +52,5 @@ finish(gctx::SingletonGraphContext) = nothing
 
 function Base.summary(io::IO, ctx::SingletonCommsContext)
     println(io, "Context: $(nameof(typeof(ctx)))")
-    println(io, "Device: $(typeof(ctx.device))")
+    println(io, "Device: $(typeof(device(ctx)))")
 end

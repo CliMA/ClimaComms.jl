@@ -4,6 +4,10 @@ ClimaComms.jl Release Notes
 main
 -------
 
+v0.6.6
+-------
+- Replaced `MPIFileLogger` with `FileLogger` and added an `OnlyRootLogger` logger that silences non-root processes [PR 104](https://github.com/CliMA/ClimaComms.jl/pull/104).
+
 v0.6.5
 -------
 
