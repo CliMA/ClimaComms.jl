@@ -20,6 +20,7 @@ executing some code. The `Device`s currently implemented are
 - [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded) for a CPU core with a single thread,
 - [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded) for a CPU core with multiple threads,
 - [`CUDADevice`](@ref ClimaComms.CUDADevice) for a single CUDA-enabled GPU.
+- [`MetalDevice`](@ref ClimaComms.MetalDevice), for a Metal-enabled GPU.
 
 `Device`s are part of [`Context`](@ref ClimaComms.AbstractCommsContext)s,
 objects that contain information require for multiple `Device`s to communicate.
