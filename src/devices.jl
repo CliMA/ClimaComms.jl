@@ -37,6 +37,13 @@ Use NVIDIA GPU accelarator
 struct CUDADevice <: AbstractDevice end
 
 """
+    MetalDevice()
+
+Use Apple Metal GPU accelerator for M-series chips.
+"""
+struct MetalDevice <: AbstractDevice end
+
+"""
     ClimaComms.device_functional(device)
 
 Return true when the `device` is correctly set up.
@@ -56,6 +63,8 @@ function device_type()
         return :CPUMultiThreaded
     elseif env_var == "CUDA"
         return :CUDADevice
+    elseif env_var == "Metal"
+        return :MetalDevice
     else
         error("Invalid CLIMACOMMS_DEVICE: $env_var")
     end
@@ -71,6 +80,7 @@ Allowed values:
 - `CPUSingleThreaded`,
 - `CPUMultiThreaded`,
 - `CUDA`.
+- `Metal`.
 
 The default is `CPU`.
 """
@@ -79,6 +89,10 @@ function device()
     if target_device == :CUDADevice && !cuda_ext_is_loaded()
         error(
             "Loading CUDA.jl is required to use CUDADevice. You might want to call ClimaComms.@import_required_backends",
+        )
+    elseif target_device == :MetalDevice && !metal_ext_is_loaded()
+        error(
+            "Loading Metal.jl is required to use MetalDevice. You might want to call ClimaComms.@import_required_backends",
         )
     end
     DeviceConstructor = getproperty(ClimaComms, target_device)

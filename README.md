@@ -15,6 +15,7 @@ CPU, or on several GPUs using with MPI).
 - `CPUSingleThreaded`
 - `CPUMultiThreaded` (not actively used)
 - `CUDADevice`
+- `MetalDevice`
 and `Context`es (i.e., environments for distributed computing):
 - `SingletonCommsContext`
 - `MPICommsContext`
