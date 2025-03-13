@@ -10,6 +10,7 @@ First, we will describe what `Device`s and `Context`s are.
 GPU, et cetera). The `Device`s implemented are
 - [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded), for a CPU core with a single thread;
 - [`CUDADevice`](@ref ClimaComms.CUDADevice), for a single CUDA GPU.
+- [`MetalDevice`](@ref ClimaComms.MetalDevice), for a Metal GPU.
 
 `Device`s in `ClimaComms` are
 [singletons](https://docs.julialang.org/en/v1/manual/types/#man-singleton-types),
@@ -117,7 +118,9 @@ devices supported by `ClimaComms`.
 Except the most basic ones, `ClimaComms` computing devices and contexts are
 implemented as independent backends. For instance, `ClimaComms` provides an
 `AbstractDevice` interface for which `CUDADevice` is an implementation that
-depends on [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl). Scripts that use
+depends on [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl). `ClimaComms` also 
+provides an `AbstractDevice` interface for `MetalDevice`, which depends on 
+[`Metal.jl`](https://github.com/Metal-for-Julia/Metal.jl). Scripts that use
 `ClimaComms` have to load the packages that power the desired backend (e.g.,
 `CUDA.jl` has to be explicitly loaded if one wants to use `CUDADevice`s).
 

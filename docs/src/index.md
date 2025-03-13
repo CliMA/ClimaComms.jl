@@ -19,6 +19,7 @@ A `Device` identifies a computing device, a piece of hardware that will be
 executing some code. The `Device`s currently implemented are
 - [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded), for a CPU core with a single thread;
 - [`CUDADevice`](@ref ClimaComms.CUDADevice), for a single CUDA-enabled GPU.
+- [`MetalDevice`](@ref ClimaComms.MetalDevice), for a Metal-enabled GPU.
 
 !!! warn
     [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded) is also available, but this device is not
