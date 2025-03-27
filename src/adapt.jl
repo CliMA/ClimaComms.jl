@@ -35,3 +35,22 @@ Adapt.adapt_structure(Array, ClimaComms.CUDADevice()) -> ClimaComms.CPUSingleThr
 """
 Adapt.adapt_structure(::Type{<:AbstractArray}, device::AbstractDevice) =
     CPUSingleThreaded()
+
+
+"""
+    adapt(device::AbstractDevice, x)
+
+Adapt an object `x` to be compatible with the specified `device`.
+"""
+function adapt(device::AbstractDevice, x)
+    return Adapt.adapt(array_type(device), x)
+end
+
+"""
+    adapt(device::AbstractCommsContext, x)
+
+Adapt an object `x` to be compatible with the specified `context`.
+"""
+function adapt(context::AbstractCommsContext, x)
+    return Adapt.adapt(array_type(device(context)), x)
+end

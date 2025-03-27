@@ -47,6 +47,7 @@ ClimaComms.AbstractGraphContext
 ClimaComms.context
 ClimaComms.graph_context
 Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractCommsContext)
+Adapt.adapt(::ClimaComms.AbstractDevice, ::Any)
 ```
 
 ## Logging
