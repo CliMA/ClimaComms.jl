@@ -4,6 +4,10 @@ ClimaComms.jl Release Notes
 main
 -------
 
+- Improved error message for `@import_required_backends`. Previously, the macro
+  would just return the julia `ArgumentError: Package MPI not found in current
+  path.` Now, it points users on what steps they might want to take.
+
 v0.6.6
 -------
 - Replaced `MPIFileLogger` with `FileLogger` and added an `OnlyRootLogger` logger that silences non-root processes [PR 104](https://github.com/CliMA/ClimaComms.jl/pull/104).
@@ -15,6 +19,7 @@ v0.6.5
   devices, and contexts containing cpu and gpu devices [PR 103](https://github.com/CliMA/ClimaComms.jl/pull/103).
 
 - New MPI logging tools were added, `MPIFileLogger` and `MPILogger` [PR 100](https://github.com/CliMA/ClimaComms.jl/pull/100).
+
 
 v0.6.4
 -------

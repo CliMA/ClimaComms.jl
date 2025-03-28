@@ -24,6 +24,14 @@ steps:
 
   - wait
 
+  - label: ":computer: test with incomplete environment"
+    key: "incomplete_env"
+    command:
+      # We raise an error when the package is not available
+      - julia --project -E "using ClimaComms, Test; @test_throws ErrorException @import_required_backends"
+    env:
+      CLIMACOMMS_CONTEXT: MPI
+
   - label: ":computer: tests"
     key: "cpu_tests"
     command:
