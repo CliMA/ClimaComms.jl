@@ -295,3 +295,7 @@ end
 @testset "Logging" begin
     include("logging.jl")
 end
+
+@testset "Adapt" begin
+    include("adapt.jl")
+end
