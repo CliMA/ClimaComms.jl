@@ -143,7 +143,7 @@ end
 We can create a custom filter that returns `false` if a log message originates from a list of excluded modules.
 
 The same pattern can be reversed to filter messages only coming from certain modules.
-```
+```julia
 using Logging, LoggingExtras
 
 module_filter(excluded_modules) = log_args ->
