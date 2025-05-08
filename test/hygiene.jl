@@ -3,10 +3,10 @@ CC.@import_required_backends
 function test_macro_hyhiene(dev)
     AT = CC.array_type(dev)
     n = 3 # tests that we can reach variables defined in scope
+
+    array = AT(rand(10))
     CC.@threaded dev for i in 1:n
-        if Threads.nthreads() > 1
-            @show Threads.threadid()
-        end
+        array[i] = sin(array[i])
     end
 
     CC.time(dev) do

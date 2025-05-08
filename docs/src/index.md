@@ -17,12 +17,9 @@ ClimaComms.AbstractDevice) and the [`Context`](@ref ClimaComms.AbstractCommsCont
 
 A `Device` identifies a computing device, a piece of hardware that will be
 executing some code. The `Device`s currently implemented are
-- [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded), for a CPU core with a single thread;
-- [`CUDADevice`](@ref ClimaComms.CUDADevice), for a single CUDA-enabled GPU.
-
-!!! warn
-    [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded) is also available, but this device is not
-    actively used or developed.
+- [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded) for a CPU core with a single thread,
+- [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded) for a CPU core with multiple threads,
+- [`CUDADevice`](@ref ClimaComms.CUDADevice) for a single CUDA-enabled GPU.
 
 `Device`s are part of [`Context`](@ref ClimaComms.AbstractCommsContext)s,
 objects that contain information require for multiple `Device`s to communicate.
@@ -63,3 +60,34 @@ julia -E "using Pkg; Pkg.add(\"CUDA\"); Pkg.add(\"MPI\")"
 Some packages come with environments that includes all possible backends
 (typically `.buildkite`). You can also consider directly using those
 environments.
+
+# Writing generic kernels
+
+To implement kernels that work across all `Device`s, `ClimaComms.jl` provides
+the [`@threaded`](@ref ClimaComms.@threaded) macro. Like the standard library's
+[`Threads.@threads`](https://docs.julialang.org/en/v1/base/multi-threading/#Base.Threads.@threads)
+macro, this can be placed in front of any `for`-loop to parallelize its
+iterations across threads. For example, given two vectors `a` and `b` of equal
+size, a threaded version of the `copyto!` function can be implemented as
+```julia-repl
+julia> threaded_copyto!(a, b) = ClimaComms.@threaded for i in axes(a, 1)
+           a[i] = b[i]
+       end
+threaded_copyto! (generic function with 1 method)
+
+julia> threaded_copyto!(a, b)
+```
+This macro offers several options for fine-tuning performance:
+- the `Device` can be specified to reduce compilation time
+- the level of thread coarsening (number of loop iterations evaluated in each
+  thread) can be specified to reduce the overhead of launching many threads
+- on GPUs, the size of each block (a collection of threads launched on a single
+  multiprocessor) can be specified to improve GPU
+  [utilization](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#multiprocessor-level)
+
+!!! note
+    Executing code on GPUs requires *static compilation*, which means that the
+    compiler must be able to infer the types of all variables used in a threaded
+    loop. For example, global variables and type variables defined outside a
+    loop should be avoided when the loop is parallelized on a GPU. See the
+    docstring of [`@threaded`](@ref ClimaComms.@threaded) for more information.
