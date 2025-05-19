@@ -4,6 +4,10 @@ ClimaComms.jl Release Notes
 main
 -------
 
+v0.6.7
+-------
+- Extended `@threaded` to work on GPU devices, with block sizes automatically determined by the CUDA occupancy API, and added the ability to control thread coarsening across all devices [PR 111](https://github.com/CliMA/ClimaComms.jl/pull/111).
+
 v0.6.6
 -------
 - Replaced `MPIFileLogger` with `FileLogger` and added an `OnlyRootLogger` logger that silences non-root processes [PR 104](https://github.com/CliMA/ClimaComms.jl/pull/104).
