@@ -50,17 +50,26 @@ ClimaComms.elapsed(f::F, ::CUDADevice, args...; kwargs...) where {F} =
 ClimaComms.assert(::CUDADevice, cond::C, text::T) where {C, T} =
     isnothing(text) ? (CUDA.@cuassert cond()) : (CUDA.@cuassert cond() text())
 
-# TODO: Generalize all of the following code to multi-dimensional thread blocks
-# and multiple iterators.
+ClimaComms.LocalArray{T, S}(::CUDADevice) where {T, S} =
+    CUDA.CuStaticSharedArray(T, S)
 
-# The number of threads in the kernel being executed by the calling thread.
+ClimaComms.local_sync(::CUDADevice) = CUDA.sync_threads()
+
+# Number of blocks in kernel being executed and index of calling thread's block.
+blocks_in_kernel() = CUDA.blockDim().x
+block_idx_in_kernel() = CUDA.blockIdx().x
+
+# Number of threads in each block of kernel being executed and index of calling
+# thread within its block.
+threads_in_block() = CUDA.gridDim().x
+thread_idx_in_block() = CUDA.threadIdx().x
+
+# Total number of threads in kernel being executed and index of calling thread.
 threads_in_kernel() = CUDA.blockDim().x * CUDA.gridDim().x
-
-# The index of the calling thread, which is between 1 and threads_in_kernel().
-thread_index() =
+thread_idx_in_kernel() =
     (CUDA.blockIdx().x - 1) * CUDA.blockDim().x + CUDA.threadIdx().x
 
-# The maximum number of blocks that can fit on the GPU used for this kernel.
+# Maximum number of blocks that can fit on the GPU used for this kernel.
 grid_size_limit(kernel) = CUDA.attribute(
     CUDA.device(kernel.fun.mod.ctx),
     CUDA.DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
@@ -73,22 +82,22 @@ block_size_limit(max_threads_in_block::Int, _) = max_threads_in_block
 block_size_limit(::Val{:auto}, kernel) =
     CUDA.launch_configuration(kernel.fun).threads
 
-function threaded(f::F, ::CUDADevice, ::Val, itr; block_size) where {F}
+function threaded(f::F, device::CUDADevice, ::Val, itr; block_size) where {F}
     length(itr) > 0 || return nothing
     Base.require_one_based_indexing(itr)
 
-    function call_f_once_from_thread()
-        item_index = thread_index()
-        item_index <= length(itr) && @inbounds f(itr[item_index])
+    function thread_function()
+        idx = thread_idx_in_kernel()
+        idx <= length(itr) && @inbounds f(itr[idx])
         return nothing
     end
-    kernel = CUDA.@cuda launch=false call_f_once_from_thread()
+    kernel = CUDA.@cuda launch=false thread_function()
     max_blocks = grid_size_limit(kernel)
     max_threads_in_block = block_size_limit(block_size, kernel)
 
     # If there are too many items, coarsen by the smallest possible amount.
     length(itr) <= max_blocks * max_threads_in_block ||
-        return threaded(f, CUDADevice(), 1, itr)
+        return threaded(f, device, 1, itr; block_size)
 
     threads_in_block = min(max_threads_in_block, length(itr))
     blocks = cld(length(itr), threads_in_block)
@@ -96,23 +105,22 @@ function threaded(f::F, ::CUDADevice, ::Val, itr; block_size) where {F}
 end
 
 function threaded(
-    f::F,
+    coarse_f::F,
     ::CUDADevice,
     min_items_in_thread::Int,
     itr;
     block_size,
 ) where {F}
-    min_items_in_thread > 0 || throw(ArgumentError("`coarsen` is not positive"))
+    min_items_in_thread > 0 ||
+        throw(ArgumentError("integer `coarsen` value must be positive"))
     length(itr) > 0 || return nothing
     Base.require_one_based_indexing(itr)
 
     # Maximize memory coalescing with a "grid-stride loop"; for reference, see
     # https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops
-    call_f_multiple_times_from_thread() =
-        for item_index in thread_index():threads_in_kernel():length(itr)
-            @inbounds f(itr[item_index])
-        end
-    kernel = CUDA.@cuda launch=false call_f_multiple_times_from_thread()
+    coarsened_thread_function() =
+        coarse_f(thread_idx_in_kernel():threads_in_kernel():length(itr))
+    kernel = CUDA.@cuda launch=false coarsened_thread_function()
     max_blocks = grid_size_limit(kernel)
     max_threads_in_block = block_size_limit(block_size, kernel)
 
@@ -126,6 +134,100 @@ function threaded(
 
     threads_in_block = min(max_threads_in_block, max_required_threads)
     blocks = cld(length(itr), items_in_thread * threads_in_block)
+    CUDA.@sync kernel(; blocks, threads = threads_in_block)
+end
+
+function threaded(
+    f::F,
+    device::CUDADevice,
+    ::Val,
+    block_itr,
+    thread_itr;
+    block_size,
+) where {F}
+    length(block_itr) > 0 || return nothing
+    length(thread_itr) > 0 || return nothing
+    Base.require_one_based_indexing(block_itr)
+    Base.require_one_based_indexing(thread_itr)
+
+    function two_itr_thread_function()
+        block_idx = block_idx_in_kernel()
+        thread_idx = thread_idx_in_block()
+        (block_idx <= length(block_itr) && thread_idx <= length(thread_itr)) &&
+            @inbounds f(block_itr[block_idx], thread_itr[thread_idx])
+        return nothing
+    end
+    kernel = CUDA.@cuda launch=false two_itr_thread_function()
+    max_blocks = grid_size_limit(kernel)
+    max_threads_in_block = block_size_limit(block_size, kernel)
+
+    # If there are too many items, coarsen by the smallest possible amount.
+    (
+        length(block_itr) <= max_blocks &&
+        length(thread_itr) <= max_threads_in_block
+    ) || return threaded(f, device, (1, 1), block_itr, thread_itr; block_size)
+
+    blocks = length(block_itr)
+    threads_in_block = length(thread_itr)
+    CUDA.@sync kernel(; blocks, threads = threads_in_block)
+end
+
+# Use a default coarsen value of 1 for @gpu_threaded loops.
+threaded(
+    coarse_f::F,
+    device::CUDADevice,
+    min_items_in_thread::Int,
+    block_itr,
+    thread_itr;
+    block_size,
+) where {F} = threaded(
+    coarse_f,
+    device,
+    (min_items_in_thread, 1),
+    block_itr,
+    thread_itr;
+    block_size,
+)
+
+function threaded(
+    coarse_f::F,
+    ::CUDADevice,
+    min_items_in_thread::Tuple{Int, Int},
+    block_itr,
+    thread_itr;
+    block_size,
+) where {F}
+    all(>(0), min_items_in_thread) ||
+        throw(ArgumentError("integer `coarsen` values must be positive"))
+    length(block_itr) > 0 || return nothing
+    length(thread_itr) > 0 || return nothing
+    Base.require_one_based_indexing(block_itr)
+    Base.require_one_based_indexing(thread_itr)
+
+    # Maximize memory coalescing with a "grid-stride loop" (reference is above).
+    coarsened_two_itr_thread_function() = coarse_f(
+        block_idx_in_kernel():blocks_in_kernel():length(block_itr),
+        thread_idx_in_block():threads_in_block():length(thread_itr),
+    )
+    kernel = CUDA.@cuda launch=false coarsened_two_itr_thread_function()
+    max_blocks = grid_size_limit(kernel)
+    max_threads_in_block = block_size_limit(block_size, kernel)
+
+    # If there are too many items to use the specified coarsening, increase it
+    # by the smallest possible amount.
+    max_required_blocks = cld(length(block_itr), min_items_in_thread[1])
+    max_required_threads_in_block =
+        cld(length(thread_itr), min_items_in_thread[2])
+    items_in_thread = (
+        max_required_blocks <= max_blocks ? min_items_in_thread[1] :
+        cld(length(block_itr), max_blocks),
+        max_required_threads_in_block <= max_threads_in_block ?
+        min_items_in_thread[2] :
+        cld(length(thread_itr), max_threads_in_block),
+    )
+
+    blocks = cld(length(block_itr), items_in_thread[1])
+    threads_in_block = cld(length(thread_itr), items_in_thread[2])
     CUDA.@sync kernel(; blocks, threads = threads_in_block)
 end
 
