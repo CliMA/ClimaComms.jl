@@ -347,9 +347,36 @@ end
 assert(::AbstractCPUDevice, cond::C, text::T) where {C, T} =
     isnothing(text) ? (Base.@assert cond()) : (Base.@assert cond() text())
 
+"""
+    LocalArray{T, S}(device)
+
+A device-flexible local array whose element type `T` and size `S` are known
+during compilation, which corresponds to an `MArray` on CPUs and a
+`CuStaticSharedArray` on NVIDIA GPUs. A `LocalArray` is typically much faster to
+read and modify than generic arrays like `Array` or `CuArray`.
+"""
+abstract type LocalArray{T, S} end
+LocalArray{T, S}(::AbstractCPUDevice) where {T, S} =
+    MArray{Tuple{S...}, T}(undef)
 
 """
-    @threaded [device] [coarsen=...] [block_size=...] for ... end
+    LocalVector{T, N}(device)
+
+Alias for a one-dimensional `LocalArray{T, (N,)}`.
+"""
+abstract type LocalVector{T, N} end
+LocalVector{T, N}(device) where {T, N} = LocalArray{T, (N,)}(device)
+
+"""
+    local_sync(device)
+
+Internal function that synchronizes all threads with access to the same
+`LocalArray`s.
+"""
+local_sync(::AbstractCPUDevice) = nothing
+
+"""
+    @threaded [device] [coarsen=...] [block_size=...] for <item> in <itr> ... end
 
 Device-flexible generalization of `Threads.@threads`, which distributes the
 iterations of a for-loop across multiple threads, with the option to control
@@ -448,6 +475,34 @@ To fix other kinds of inference issues on GPUs, especially ones brought about by
 indexing into iterators with nonuniform element types, see
 [`UnrolledUtilities.jl`](https://github.com/CliMA/UnrolledUtilities.jl).
 """
+macro threaded end
+
+"""
+    @threaded [device] [coarsen=...] [block_size=...] for <item> in <itr>
+        ...
+        @gpu_threaded for <gpu_threaded_item> in <gpu_threaded_itr> ... end
+        ...
+    end
+
+The `@gpu_threaded` macro can be used inside an `@threaded` loop to implement
+a second level of parallelization on GPUs. Using `@gpu_threaded` changes the
+behavior of `@threaded` so that the outer loop is only parallelized across GPU
+blocks, while the inner loop is parallelized across GPU threads. It also allows
+the `coarsen` argument to be a `Tuple` of two integers, where the the first
+represents coarsening of the outer loop's iterator and the second represents
+coarsening of the inner loop's iterator. (When only one integer is used, the
+inner loop's iterator gets a default coarsening value of 1.) Every
+`@gpu_threaded` loop in a single `@threaded` loop must have the same iterator
+and variable.
+
+On CPUs, `@gpu_threaded` has no effect, and it can be omitted without impacting
+performance or latency. On GPUs, it can be used conjunction with `LocalArray`s
+or `LocalVector`s to synchronize shared memory across GPU threads.
+"""
+macro gpu_threaded(_...)
+    throw(ArgumentError("@gpu_threaded can only be inside an @threaded loop"))
+end
+
 macro threaded(args...)
     usage_string = "Usage: @threaded [device] [coarsen=...] [block_size=...] for ... end"
     n_args = length(args)
@@ -480,27 +535,172 @@ macro threaded(args...)
     end
 
     loop_expr = args[n_args]
-    Meta.isexpr(loop_expr, :for) || throw(ArgumentError(usage_string))
-    (var_and_itr_expr, loop_body) = loop_expr.args
-    Meta.isexpr(var_and_itr_expr, :(=)) ||
-        throw(ArgumentError("@threaded does not support nested loops"))
-    (var_expr, itr_expr) = var_and_itr_expr.args
+    unthreaded_expr = escaped_f_expr(loop_expr)
+    function_defs_expr, itr_exprs =
+        escaped_function_defs_and_itr_exprs(loop_expr)
 
     return quote
+        $function_defs_expr
         device = $(esc(device_expr))
-        device isa CPUSingleThreaded ? $(esc(loop_expr)) :
-        threaded(
-            $(esc(var_expr)) -> $(esc(loop_body)),
-            device,
-            $(esc(coarsen_expr)),
-            $(esc(itr_expr));
-            block_size = $(esc(block_size_expr)),
-        )
+        if device isa CPUSingleThreaded
+            $unthreaded_expr
+        else
+            coarsen = $(esc(coarsen_expr))
+            block_size = $(esc(block_size_expr))
+            if coarsen isa Val
+                threaded(f, device, coarsen, $(itr_exprs...); block_size)
+            else
+                threaded(coarse_f, device, coarsen, $(itr_exprs...); block_size)
+            end
+        end
     end
 end
 
-threaded(f::F, device, coarsen, itr; gpu_kwargs...) where {F} =
-    threaded(f, device, coarsen, itr) # Drop kwargs that are only used for GPUs.
+function escaped_function_defs_and_itr_exprs(threaded_arg_expr)
+    Meta.isexpr(threaded_arg_expr, :for) ||
+        throw(ArgumentError("argument of @threaded must be a for-loop"))
+    (var_and_itr_expr, loop_iteration_expr) = threaded_arg_expr.args
+    Meta.isexpr(var_and_itr_expr, :(=)) ||
+        throw(ArgumentError("@threaded loop can only use one iterator"))
+    (var_expr, itr_expr) = var_and_itr_expr.args
+    (gpu_threaded_var_expr, gpu_threaded_itr_expr) =
+        gpu_threaded_var_and_itr_exprs(loop_iteration_expr)
+    f_expr = escaped_f_expr(loop_iteration_expr)
+    coarse_f_expr = quote
+        for itr_index in itr_indices
+            @inbounds $(esc(var_expr)) = $(esc(itr_expr))[itr_index]
+            $f_expr
+        end
+    end
+    f_def_expr = :(f($(esc(var_expr))) = $f_expr)
+    coarse_f_def_expr = :(coarse_f(itr_indices) = $coarse_f_expr)
+    function_defs_expr_args = [f_def_expr, coarse_f_def_expr]
+    if gpu_threaded_var_expr != nothing
+        gpu_threaded_f_expr = escaped_gpu_threaded_f_expr(loop_iteration_expr)
+        gpu_threaded_coarse_f_loop_iteration_expr =
+            escaped_gpu_threaded_coarse_f_expr(
+                loop_iteration_expr,
+                gpu_threaded_var_expr,
+                gpu_threaded_itr_expr,
+            )
+        gpu_threaded_coarse_f_expr = quote
+            for itr_index in itr_indices
+                @inbounds $(esc(var_expr)) = $(esc(itr_expr))[itr_index]
+                $(gpu_threaded_coarse_f_loop_iteration_expr)
+            end
+        end
+        gpu_threaded_f_def_expr = :(
+            f($(esc(var_expr)), $(esc(gpu_threaded_var_expr))) =
+                $gpu_threaded_f_expr
+        )
+        gpu_threaded_coarse_f_def_expr = :(
+            coarse_f(itr_indices, gpu_threaded_itr_indices) =
+                $gpu_threaded_coarse_f_expr
+        )
+        append!(
+            function_defs_expr_args,
+            [gpu_threaded_f_def_expr, gpu_threaded_coarse_f_def_expr],
+        )
+    end
+    itr_exprs =
+        gpu_threaded_var_expr == nothing ? [esc(itr_expr)] :
+        [esc(itr_expr), esc(gpu_threaded_itr_expr)]
+    return Expr(:block, function_defs_expr_args...), itr_exprs
+end
+
+is_gpu_threaded_macro_call_expr(arg) =
+    Meta.isexpr(arg, :macrocall) &&
+    arg.args[1] in (:(var"@gpu_threaded"), :(ClimaComms.var"@gpu_threaded"))
+
+gpu_threaded_var_and_itr_exprs(arg) =
+    if is_gpu_threaded_macro_call_expr(arg)
+        gpu_threaded_arg_expr = arg.args[3]
+        Meta.isexpr(gpu_threaded_arg_expr, :for) ||
+            throw(ArgumentError("argument of @gpu_threaded must be a for-loop"))
+        var_and_itr_expr = gpu_threaded_arg_expr.args[1]
+        Meta.isexpr(var_and_itr_expr, :(=)) ||
+            throw(ArgumentError("@gpu_threaded loop can only use one iterator"))
+        var_and_itr_expr.args
+    elseif arg isa Expr
+        var_and_itr_exprs = Any[nothing, nothing]
+        for inner_arg in arg.args
+            new_var_and_itr_exprs = gpu_threaded_var_and_itr_exprs(inner_arg)
+            new_var_and_itr_exprs == Any[nothing, nothing] && continue
+            if var_and_itr_exprs == Any[nothing, nothing]
+                var_and_itr_exprs = new_var_and_itr_exprs
+            elseif var_and_itr_exprs != new_var_and_itr_exprs
+                throw(ArgumentError("all @gpu_threaded loops in a @threaded \
+                                     loop must use the same iterator and \
+                                     variable name"))
+            end
+        end
+        var_and_itr_exprs
+    else
+        Any[nothing, nothing]
+    end
+
+escaped_f_expr(arg) =
+    if is_gpu_threaded_macro_call_expr(arg)
+        esc(arg.args[3])
+    elseif arg isa Expr
+        Expr(arg.head, Base.mapany(escaped_f_expr, arg.args)...)
+    else
+        arg isa Symbol ? esc(arg) : arg
+    end
+
+escaped_gpu_threaded_f_expr(arg) =
+    if is_gpu_threaded_macro_call_expr(arg)
+        gpu_threaded_arg_expr = arg.args[3]
+        gpu_threaded_loop_iteration_expr = gpu_threaded_arg_expr.args[2]
+        quote
+            $(esc(gpu_threaded_loop_iteration_expr))
+            local_sync(device)
+        end
+    elseif arg isa Expr
+        Expr(arg.head, Base.mapany(escaped_gpu_threaded_f_expr, arg.args)...)
+    else
+        arg isa Symbol ? esc(arg) : arg
+    end
+
+escaped_gpu_threaded_coarse_f_expr(
+    arg,
+    gpu_threaded_var_expr,
+    gpu_threaded_itr_expr,
+) =
+    if is_gpu_threaded_macro_call_expr(arg)
+        gpu_threaded_arg_expr = arg.args[3]
+        gpu_threaded_loop_iteration_expr = gpu_threaded_arg_expr.args[2]
+        quote
+            for gpu_threaded_itr_index in gpu_threaded_itr_indices
+                @inbounds $(esc(gpu_threaded_var_expr)) =
+                    $(esc(gpu_threaded_itr_expr))[gpu_threaded_itr_index]
+                $(esc(gpu_threaded_loop_iteration_expr))
+            end
+            local_sync(device)
+        end
+    elseif arg isa Expr
+        new_inner_args = Base.mapany(arg.args) do inner_arg
+            escaped_gpu_threaded_coarse_f_expr(
+                inner_arg,
+                gpu_threaded_var_expr,
+                gpu_threaded_itr_expr,
+            )
+        end
+        Expr(arg.head, new_inner_args...)
+    else
+        arg isa Symbol ? esc(arg) : arg
+    end
+
+# Ignore the block_size keyword argument when using @threaded on CPUs.
+threaded(f_or_coarse_f::F, args...; block_size) where {F} =
+    threaded(f_or_coarse_f, args...)
+
+# Ignore @gpu_threaded iterators and their corresponding values of coarsen when
+# using @threaded on CPUs.
+threaded(f_or_coarse_f::F, device, coarsen, itr, _) where {F} =
+    threaded(f_or_coarse_f, device, coarsen, itr)
+threaded(f_or_coarse_f::F, device, coarsen::Tuple{Int, Int}, itr, _) where {F} =
+    threaded(f_or_coarse_f, device, coarsen[1], itr)
 
 threaded(f::F, ::CPUMultiThreaded, ::Val{:dynamic}, itr) where {F} =
     Threads.@threads :dynamic for item in itr
@@ -519,16 +719,20 @@ threaded(f::F, ::CPUMultiThreaded, ::Val{:static}, itr) where {F} =
         end
 end
 
-function threaded(f::F, ::CPUMultiThreaded, items_in_thread::Int, itr) where {F}
-    items_in_thread > 0 || throw(ArgumentError("`coarsen` is not positive"))
+function threaded(
+    coarse_f::F,
+    ::CPUMultiThreaded,
+    items_in_thread::Int,
+    itr,
+) where {F}
+    items_in_thread > 0 ||
+        throw(ArgumentError("integer `coarsen` value must be positive"))
     Base.require_one_based_indexing(itr)
 
     threads = cld(length(itr), items_in_thread)
     Threads.@threads :static for thread_index in 1:threads
         first_item_index = items_in_thread * (thread_index - 1) + 1
         last_item_index = items_in_thread * thread_index
-        for item_index in first_item_index:min(last_item_index, length(itr))
-            @inbounds f(itr[item_index])
-        end
+        coarse_f(first_item_index:min(last_item_index, length(itr)))
     end
 end
