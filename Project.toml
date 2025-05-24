@@ -7,6 +7,7 @@ version = "0.6.7"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 LoggingExtras = "e6f89c97-d47a-5376-807f-9c37f3926c36"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
@@ -17,9 +18,10 @@ ClimaCommsCUDAExt = "CUDA"
 ClimaCommsMPIExt = "MPI"
 
 [compat]
-CUDA = "3, 4, 5"
 Adapt = "3, 4"
+CUDA = "3, 4, 5"
 Logging = "1.9.4"
 LoggingExtras = "1.1.0"
 MPI = "0.20.18"
+StaticArrays = "1.9"
 julia = "1.9"
