@@ -1,4 +1,5 @@
 import ..ClimaComms
+import StaticArrays: MArray
 
 """
     AbstractDevice
@@ -347,7 +348,6 @@ end
 assert(::AbstractCPUDevice, cond::C, text::T) where {C, T} =
     isnothing(text) ? (Base.@assert cond()) : (Base.@assert cond() text())
 
-
 """
     @threaded [device] [coarsen=...] [block_size=...] for ... end
 
@@ -449,7 +449,8 @@ indexing into iterators with nonuniform element types, see
 [`UnrolledUtilities.jl`](https://github.com/CliMA/UnrolledUtilities.jl).
 """
 macro threaded(args...)
-    usage_string = "Usage: @threaded [device] [coarsen=...] [block_size=...] for ... end"
+    usage_string = "Usage: @threaded [device] [coarsen=...] [block_size=...] \
+                    for ... end"
     n_args = length(args)
     1 <= n_args <= 3 || throw(ArgumentError(usage_string))
 
@@ -479,28 +480,180 @@ macro threaded(args...)
         block_size_expr = :(Val($(block_size_expr)))
     end
 
-    loop_expr = args[n_args]
-    Meta.isexpr(loop_expr, :for) || throw(ArgumentError(usage_string))
-    (var_and_itr_expr, loop_body) = loop_expr.args
-    Meta.isexpr(var_and_itr_expr, :(=)) ||
-        throw(ArgumentError("@threaded does not support nested loops"))
-    (var_expr, itr_expr) = var_and_itr_expr.args
+    loop_expr = if Meta.isexpr(args[n_args], :for)
+        args[n_args]
+    elseif (
+        Meta.isexpr(args[n_args], :block) &&
+        length(args[n_args].args) == 2 &&
+        args[n_args].args[1] isa LineNumberNode &&
+        Meta.isexpr(args[n_args].args[2], :for)
+    )
+        args[n_args].args[2]
+    else
+        throw(ArgumentError(usage_string))
+    end
+    (loop_def_expr, loop_body_expr) = loop_expr.args
+    item_and_itr_exprs = if Meta.isexpr(loop_def_expr, :(=))
+        [loop_def_expr.args]
+    elseif Meta.isexpr(loop_def_expr, :block) && length(loop_def_expr.args) == 2
+        [loop_def_expr.args[1].args, loop_def_expr.args[2].args]
+    else
+        throw(ArgumentError("@threaded only supports one or two loops"))
+    end
 
-    return quote
-        device = $(esc(device_expr))
-        device isa CPUSingleThreaded ? $(esc(loop_expr)) :
-        threaded(
-            $(esc(var_expr)) -> $(esc(loop_body)),
-            device,
-            $(esc(coarsen_expr)),
-            $(esc(itr_expr));
-            block_size = $(esc(block_size_expr)),
-        )
+    is_interdependent_itr_expr(expr) =
+        Meta.isexpr(expr, :macrocall) && expr.args[1] in
+        (Symbol("@interdependent"), :(ClimaComms.var"@interdependent"))
+    interdependent_item_and_itr_exprs =
+        filter(is_interdependent_itr_expr ∘ last, item_and_itr_exprs)
+    independent_item_and_itr_exprs =
+        filter(!is_interdependent_itr_expr ∘ last, item_and_itr_exprs)
+    one_loop_string = "@threaded only supports up to one loop of the form "
+    length(interdependent_item_and_itr_exprs) <= 1 ||
+        throw(ArgumentError(one_loop_string * "`var in @interdependent(itr)`"))
+    length(independent_item_and_itr_exprs) <= 1 ||
+        throw(ArgumentError(one_loop_string * "`var in itr`"))
+
+    if isempty(independent_item_and_itr_exprs)
+        # If independent itr is missing, use (nothing,) as a default.
+        independent_item_expr = :_
+        independent_itr_expr = :((nothing,))
+        coarsen_expr = :((Val(:dynamic), $coarsen_expr))
+    else
+        (independent_item_expr, independent_itr_expr) =
+            independent_item_and_itr_exprs[1]
+    end
+
+    if isempty(interdependent_item_and_itr_exprs)
+        return quote
+            device = $(esc(device_expr))
+            device isa CPUSingleThreaded ? $(esc(loop_expr)) :
+            threaded(
+                $(esc(independent_item_expr)) -> $(esc(loop_body_expr)),
+                device,
+                $(esc(coarsen_expr)),
+                $(esc(independent_itr_expr));
+                block_size = $(esc(block_size_expr)),
+            )
+        end
+    else
+        interdependent_item_expr = interdependent_item_and_itr_exprs[1][1]
+        interdependent_itr_expr =
+            interdependent_item_and_itr_exprs[1][2].args[3]
+
+        is_sync_interdependent_expr(expr) =
+            Meta.isexpr(expr, :macrocall) && expr.args[1] in (
+                Symbol("@sync_interdependent"),
+                :(ClimaComms.var"@sync_interdependent"),
+            )
+        autofill_sync_interdependent!(expr, item_expr) =
+            if is_sync_interdependent_expr(expr)
+                length(expr.args) == 3 && insert!(expr.args, 3, item_expr)
+            elseif expr isa Expr
+                for arg in expr.args
+                    autofill_sync_interdependent!(arg, item_expr)
+                end
+            end
+        autofill_sync_interdependent!(loop_body_expr, interdependent_item_expr)
+
+        return quote
+            device = $(esc(device_expr))
+            device isa CPUSingleThreaded ?
+            for $(esc(independent_item_expr)) in $(esc(independent_itr_expr))
+                $(esc(interdependent_item_expr)) =
+                    AllInterdependentItems($(esc(interdependent_itr_expr)))
+                $(esc(loop_body_expr))
+            end :
+            threaded(
+                device,
+                $(esc(coarsen_expr)),
+                $(esc(independent_itr_expr)),
+                $(esc(interdependent_itr_expr));
+                block_size = $(esc(block_size_expr)),
+            ) do $(esc(independent_item_expr)), $(esc(interdependent_item_expr))
+                $(esc(loop_body_expr))
+            end
+        end
     end
 end
 
-threaded(f::F, device, coarsen, itr; gpu_kwargs...) where {F} =
-    threaded(f, device, coarsen, itr) # Drop kwargs that are only used for GPUs.
+"""
+    @interdependent(itr)
+
+Annotation for an iterator of an `@threaded` loop that allows elements of the
+iterator to affect each other within the loop. If an unannotated iterator is
+used in an `@threaded` loop, its elements are assumed to be independent (naively
+parallelizable). Items from an `@interdependent` iterator can only be used
+within `@sync_interdependent` expressions, ensuring that all interdependencies
+are isolated by thread synchronizations on GPUs. Since threads cannot be
+efficiently synchronized on CPUs, all items in an `@interdependent` iterator are
+processed on a single CPU thread, and each `@sync_interdependent` expression is
+transformed into a separate for-loop.
+
+This annotation can be used in conjunction with `static_shared_memory_array` to
+implement performant kernels with interdependent threads in a device-agnostic
+way, e.g.,
+
+```julia-repl
+julia> first_axis_derivative!(device, a, ::Val{N}) where {N} =
+           ClimaComms.@threaded device for i in @interdependent(1:N), j in axes(a, 2)
+               a_j = ClimaComms.static_shared_memory_array(device, eltype(a), N)
+               ClimaComms.@sync_interdependent a_j[i] = a[i, j]
+               ClimaComms.@sync_interdependent if i == 1
+                   a[1, j] = a_j[2] - a_j[1]
+               elseif i == N
+                   a[N, j] = a_j[N] - a_j[N - 1]
+               else
+                   a[i, j] = (a_j[i + 1] - 2 * a_j[i] + a_j[i - 1]) / 2
+               end
+           end
+first_axis_derivative! (generic function with 1 method)
+
+julia> AT = ClimaComms.array_type(ClimaComms.device()); # Array or CuArray
+
+julia> a = AT(rand(100, 1000));
+
+julia> first_axis_derivative!(ClimaComms.device(), a, Val(100))
+```
+
+A `@threaded` loop can have at most one independent iterator and one
+interdependent iterator. When two iterators are specified, as in the example
+above, the independent iterator is parallelized across GPU blocks, and the
+interdependent iterator is parallelized across threads within each block.
+Passing a single integer value to `coarsen` will only apply thread coarsening to
+the independent iterator when there are two iterators, but `coarsen` can also be
+specified as a pair of integers, in which case the second integer controls
+thread coarsening of the interdependent iterator.
+"""
+macro interdependent(itr)
+    throw(ArgumentError("@interdependent can only be used to specify an \
+                         iterator of a @threaded loop"))
+end
+
+# Ignore the block_size keyword argument on CPUs.
+threaded(f::F, device::AbstractCPUDevice, args...; block_size) where {F} =
+    threaded(f, device, args...)
+
+# Ignore values of coarsen specified for interdependent iterators on CPUs.
+threaded(
+    f::F,
+    device::AbstractCPUDevice,
+    coarsen::NTuple{2, Any},
+    independent_itr,
+    interdependent_itr,
+) where {F} =
+    threaded(f, device, coarsen[1], independent_itr, interdependent_itr)
+
+threaded(
+    f::F,
+    device::AbstractCPUDevice,
+    coarsen,
+    independent_itr,
+    interdependent_itr,
+) where {F} =
+    threaded(device, coarsen, independent_itr) do independent_item
+        f(independent_item, AllInterdependentItems(interdependent_itr))
+    end
 
 threaded(f::F, ::CPUMultiThreaded, ::Val{:dynamic}, itr) where {F} =
     Threads.@threads :dynamic for item in itr
@@ -520,7 +673,8 @@ threaded(f::F, ::CPUMultiThreaded, ::Val{:static}, itr) where {F} =
 end
 
 function threaded(f::F, ::CPUMultiThreaded, items_in_thread::Int, itr) where {F}
-    items_in_thread > 0 || throw(ArgumentError("`coarsen` is not positive"))
+    items_in_thread > 0 ||
+        throw(ArgumentError("integer `coarsen` value must be positive"))
     Base.require_one_based_indexing(itr)
 
     threads = cld(length(itr), items_in_thread)
@@ -532,3 +686,90 @@ function threaded(f::F, ::CPUMultiThreaded, items_in_thread::Int, itr) where {F}
         end
     end
 end
+
+"""
+    InterdependentIteratorData
+
+Intermediate representation of an item from an `@interdependent` iterator.
+Within each `@sync_interdependent` expression, this is replaced by a concrete
+value and can be used as if it were in a standard for-loop.
+"""
+abstract type InterdependentIteratorData end
+struct OneInterdependentItem{I, D} <: InterdependentIteratorData
+    item::I
+    device::D
+end
+struct MultipleInterdependentItems{T, I, D} <: InterdependentIteratorData
+    itr::T
+    indices::I
+    device::D
+end
+struct AllInterdependentItems{T} <: InterdependentIteratorData
+    itr::T
+end
+
+"""
+    @sync_interdependent [item] code
+
+Synchronizes a segment of code within an `@threaded` loop, allowing the
+specified `item` from an `@interdependent` iterator to be used as if it were in
+a standard for-loop. If this macro is used called from the same lexical scope as
+its `@threaded` loop, the `item` variable can be determined automatically.
+
+On GPU devices, the threads in every block are synchronized at the end of each
+`@sync_interdependent` expression. In coarsened GPU threads, the code is
+transformed into a for-loop over several items from the `@interdependent`
+iterator, after which the threads in every block are synchronized. On CPU
+devices, the code is transformed into a for-loop over the entire iterator.
+"""
+macro sync_interdependent(code_expr)
+    throw(ArgumentError("Usage: @sync_interdependent item code"))
+end
+macro sync_interdependent(item_expr, code_expr)
+    return quote
+        sync_interdependent($(esc(item_expr))) do $(esc(item_expr))
+            $(esc(code_expr))
+        end
+    end
+end
+
+function sync_interdependent(f::F, data::OneInterdependentItem) where {F}
+    f(data.item)
+    synchronize_gpu_threads(data.device)
+end
+
+function sync_interdependent(f::F, data::MultipleInterdependentItems) where {F}
+    for index in data.indices
+        @inbounds item = data.itr[index]
+        f(item)
+    end
+    synchronize_gpu_threads(data.device)
+end
+
+sync_interdependent(f::F, data::AllInterdependentItems) where {F} =
+    for item in data.itr
+        f(item)
+    end
+
+"""
+    synchronize_gpu_threads(device)
+
+Synchronizes GPU threads with access to the same shared memory arrays. On CPU
+devices, `synchronize_gpu_threads` does nothing. Every `@sync_interdependent`
+expression is automatically followed by a call to this function on GPUs.
+"""
+synchronize_gpu_threads(::AbstractCPUDevice) = nothing
+
+"""
+    static_shared_memory_array(device, T, dims...)
+
+Device-flexible array whose element type `T` and dimensions `dims` are known
+during compilation, which corresponds to a static shared memory array on GPUs.
+On CPUs, which do not provide access to high-performance shared memory, this
+corresponds to an `MArray` instead. A `static_shared_memory_array` is much
+faster to access and modify than generic arrays like `Array` or `CuArray`. In
+`@threaded` loops, each `static_shared_memory_array` is shared by all threads
+with the same independent iterator items.
+"""
+static_shared_memory_array(::AbstractCPUDevice, ::Type{T}, dims...) where {T} =
+    MArray{Tuple{dims...}, T}(undef)
