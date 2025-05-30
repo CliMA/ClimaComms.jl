@@ -12,10 +12,12 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 [weakdeps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 MPI = "da04e1cc-30fd-572f-bb4f-1f8673147195"
+Metal = "dde4c033-4e86-420c-a63e-0dd931031962"
 
 [extensions]
 ClimaCommsCUDAExt = "CUDA"
 ClimaCommsMPIExt = "MPI"
+ClimaCommsMetalExt = "Metal"
 
 [compat]
 Adapt = "3, 4"
@@ -24,4 +26,5 @@ Logging = "1.9.4"
 LoggingExtras = "1.1.0"
 MPI = "0.20.18"
 StaticArrays = "1.9"
+Metal = "1"
 julia = "1.9"
