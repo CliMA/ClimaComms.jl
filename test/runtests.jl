@@ -231,8 +231,9 @@ end
 end
 
 @testset "independent threaded" begin
-    a = AT(rand(100))
-    b = AT(rand(100))
+    FT = Float32
+    a = AT(rand(FT, 100))
+    b = AT(rand(FT, 100))
     is_single_cpu_thread =
         device isa ClimaComms.CPUSingleThreaded &&
         context isa ClimaComms.SingletonCommsContext
@@ -316,9 +317,10 @@ end
             end
         end
 
-    a_threaded = AT(rand(100))
-    a_unthreaded = AT(rand(100))
-    b = AT(rand(100))
+    FT = Float32
+    a_threaded = AT(rand(FT, 100))
+    a_unthreaded = AT(rand(FT, 100))
+    b = AT(rand(FT, 100))
     is_single_cpu_thread =
         device isa ClimaComms.CPUSingleThreaded &&
         context isa ClimaComms.SingletonCommsContext
@@ -385,9 +387,10 @@ end
             end
         end
 
-    a_threaded = AT(rand(100, 100))
-    a_unthreaded = AT(rand(100, 100))
-    b = AT(rand(100, 100))
+    FT = Float32
+    a_threaded = AT(rand(FT, 100, 100))
+    a_unthreaded = AT(rand(FT, 100, 100))
+    b = AT(rand(FT, 100, 100))
     is_single_cpu_thread =
         device isa ClimaComms.CPUSingleThreaded &&
         context isa ClimaComms.SingletonCommsContext
