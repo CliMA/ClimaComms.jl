@@ -75,7 +75,7 @@ but do not import `CUDA.jl` in your code.
 `ClimaComms` provides a macro, [`ClimaComms.@import_required_backends`](@ref),
 that you can add at the top of your scripts to automatically load the required
 packages when needed. Note, the packages have to be in your Julia environment,
-so you might install packages like ` MPI.jl` and `CUDA.jl` (or `Metal.jl`).
+so you might install packages like `MPI.jl` and `CUDA.jl` (or `Metal.jl`).
 
 ## How can I see the MPI state and verify that MPI is set up correctly?
 

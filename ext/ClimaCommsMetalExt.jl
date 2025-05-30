@@ -24,7 +24,7 @@ Print a summary of the Metal device.
 """
 function Base.summary(io::IO, ::MetalDevice)
     # Get the default Metal device
-    dev = Metal.devices()[1]
+    dev = Metal.device()
     name = dev.name
     return "$name (Metal)"
 end
@@ -78,7 +78,7 @@ ClimaComms.allowscalar(f, ::MetalDevice, args...; kwargs...) =
 # Extending ClimaComms methods that operate on expressions
 ClimaComms.sync(f::F, ::MetalDevice, args...; kwargs...) where {F} =
     Metal.@sync f(args...; kwargs...)
-ClimaComms.cuda_sync(f::F, ::MetalDevice, args...; kwargs...) where {F} =
+ClimaComms.cuda_sync(f::F, ::MetalDevice, args...; kwargs...) where {F} =  # TODO: Rename to `device_sync` to unify `Metal` and `CUDA`
     Metal.@sync f(args...; kwargs...)
 ClimaComms.time(f::F, ::MetalDevice, args...; kwargs...) where {F} =
     Metal.@time f(args...; kwargs...)

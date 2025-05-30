@@ -4,7 +4,7 @@ function test_macro_hyhiene(dev)
     AT = CC.array_type(dev)
     n = 3 # tests that we can reach variables defined in scope
 
-    array = AT(rand(10))
+    array = AT(rand(Float32, 10))
     CC.@threaded dev for i in 1:n
         array[i] = sin(array[i])
     end
