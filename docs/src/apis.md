@@ -28,13 +28,16 @@ ClimaComms.device
 ClimaComms.device_functional
 ClimaComms.array_type
 ClimaComms.allowscalar
-ClimaComms.@threaded
 ClimaComms.@time
 ClimaComms.@elapsed
 ClimaComms.@assert
 ClimaComms.@sync
 ClimaComms.@cuda_sync
 Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractDevice)
+ClimaComms.@threaded
+ClimaComms.threaded
+ClimaComms.threadable
+ClimaComms.ThreadableWrapper
 ```
 
 ## Contexts
