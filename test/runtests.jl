@@ -1,5 +1,7 @@
 using Test
 using ClimaComms
+import ClimaComms: MArray
+
 ClimaComms.@import_required_backends
 
 context = ClimaComms.context()
@@ -228,39 +230,177 @@ end
     @test x == Array(a)[1]
 end
 
-@testset "threaded" begin
+@testset "independent threaded" begin
     a = AT(rand(100))
     b = AT(rand(100))
+    is_single_cpu_thread =
+        device isa ClimaComms.CPUSingleThreaded &&
+        context isa ClimaComms.SingletonCommsContext
 
     kernel1!(a, b) = ClimaComms.@threaded for i in axes(a, 1)
         a[i] = b[i]
     end
     kernel1!(a, b)
     @test a == b
+    is_single_cpu_thread && @test (@allocated kernel1!(a, b)) == 0
 
     kernel2!(a, b) = ClimaComms.@threaded coarsen=:static for i in axes(a, 1)
         a[i] = 2 * b[i]
     end
     kernel2!(a, b)
     @test a == 2 * b
+    is_single_cpu_thread && @test (@allocated kernel2!(a, b)) == 0
 
     kernel3!(a, b) = ClimaComms.@threaded device coarsen=3 for i in axes(a, 1)
         a[i] = 3 * b[i]
     end
     kernel3!(a, b)
     @test a == 3 * b
+    is_single_cpu_thread && @test (@allocated kernel3!(a, b)) == 0
 
     kernel4!(a, b) = ClimaComms.@threaded device coarsen=400 for i in axes(a, 1)
         a[i] = 4 * b[i]
     end
     kernel4!(a, b)
     @test a == 4 * b
+    is_single_cpu_thread && @test (@allocated kernel4!(a, b)) == 0
 
     kernel5!(a, b) = ClimaComms.@threaded block_size=50 for i in axes(a, 1)
         a[i] = 5 * b[i]
     end
     kernel5!(a, b)
     @test a == 5 * b
+    is_single_cpu_thread && @test (@allocated kernel5!(a, b)) == 0
+end
+
+@testset "interdependent threaded" begin
+    set_deriv_at_point!(output, input, i) =
+        if i == 1
+            output[1] = input[2] - input[1]
+        elseif i == 100
+            output[100] = input[100] - input[99]
+        else
+            output[i] = (input[i + 1] - 2 * input[i] + input[i - 1]) / 2
+        end
+
+    function threaded_deriv_with_respect_to_i(device, input, i)
+        output =
+            ClimaComms.static_shared_memory_array(device, eltype(input), 100)
+        ClimaComms.@sync_interdependent i set_deriv_at_point!(output, input, i)
+        return output
+    end
+
+    function unthreaded_deriv_with_respect_to_i(device, input)
+        output = MArray{Tuple{100}, eltype(input)}(undef)
+        for i in axes(input, 1)
+            set_deriv_at_point!(output, input, i)
+        end
+        return output
+    end
+
+    threaded_deriv3_with_respect_to_i!(device, a, b) =
+        ClimaComms.@threaded device for i in @interdependent(axes(a, 1))
+            ∂b_∂i = threaded_deriv_with_respect_to_i(device, b, i)
+            ∂²b_∂i² = threaded_deriv_with_respect_to_i(device, ∂b_∂i, i)
+            ∂³b_∂i³ = threaded_deriv_with_respect_to_i(device, ∂²b_∂i², i)
+            ClimaComms.@sync_interdependent i a[i] = ∂³b_∂i³[i]
+        end
+
+    unthreaded_deriv3_with_respect_to_i!(device, a, b) =
+        ClimaComms.allowscalar(device) do
+            ∂b_∂i = unthreaded_deriv_with_respect_to_i(device, b)
+            ∂²b_∂i² = unthreaded_deriv_with_respect_to_i(device, ∂b_∂i)
+            ∂³b_∂i³ = unthreaded_deriv_with_respect_to_i(device, ∂²b_∂i²)
+            for i in axes(a, 1)
+                a[i] = ∂³b_∂i³[i]
+            end
+        end
+
+    a_threaded = AT(rand(100))
+    a_unthreaded = AT(rand(100))
+    b = AT(rand(100))
+    is_single_cpu_thread =
+        device isa ClimaComms.CPUSingleThreaded &&
+        context isa ClimaComms.SingletonCommsContext
+
+    threaded_deriv3_with_respect_to_i!(device, a_threaded, b)
+    unthreaded_deriv3_with_respect_to_i!(device, a_unthreaded, b)
+    @test a_threaded == a_unthreaded
+
+    # TODO: Figure out source of allocations for interdependent iterators.
+    threaded_allocations =
+        @allocated threaded_deriv3_with_respect_to_i!(device, a_threaded, b)
+    @info "Allocated $threaded_allocations bytes"
+    is_single_cpu_thread && @test_broken threaded_allocations == 0
+end
+
+@testset "independent and interdependent threaded" begin
+    set_deriv_at_point!(output, input, i, j...) =
+        if i == 1
+            output[1] = input[2, j...] - input[1, j...]
+        elseif i == 100
+            output[100] = input[100, j...] - input[99, j...]
+        else
+            output[i] =
+                (input[i + 1, j...] - 2 * input[i, j...] + input[i - 1, j...]) /
+                2
+        end
+
+    function threaded_deriv_with_respect_to_i(device, input, i, j...)
+        output =
+            ClimaComms.static_shared_memory_array(device, eltype(input), 100)
+        ClimaComms.@sync_interdependent i begin
+            set_deriv_at_point!(output, input, i, j...)
+        end
+        return output
+    end
+
+    function unthreaded_deriv_with_respect_to_i(device, input, j...)
+        output = MArray{Tuple{100}, eltype(input)}(undef)
+        for i in axes(input, 1)
+            set_deriv_at_point!(output, input, i, j...)
+        end
+        return output
+    end
+
+    threaded_deriv3_with_respect_to_i!(device, a, b) =
+        ClimaComms.@threaded device begin
+            for i in @interdependent(axes(a, 1)), j in axes(a, 2)
+                ∂b_∂i = threaded_deriv_with_respect_to_i(device, b, i, j)
+                ∂²b_∂i² = threaded_deriv_with_respect_to_i(device, ∂b_∂i, i)
+                ∂³b_∂i³ = threaded_deriv_with_respect_to_i(device, ∂²b_∂i², i)
+                ClimaComms.@sync_interdependent a[i, j] = ∂³b_∂i³[i]
+            end
+        end
+
+    unthreaded_deriv3_with_respect_to_i!(device, a, b) =
+        ClimaComms.allowscalar(device) do
+            for j in axes(a, 2)
+                ∂b_∂i = unthreaded_deriv_with_respect_to_i(device, b, j)
+                ∂²b_∂i² = unthreaded_deriv_with_respect_to_i(device, ∂b_∂i)
+                ∂³b_∂i³ = unthreaded_deriv_with_respect_to_i(device, ∂²b_∂i²)
+                for i in axes(a, 1)
+                    a[i, j] = ∂³b_∂i³[i]
+                end
+            end
+        end
+
+    a_threaded = AT(rand(100, 100))
+    a_unthreaded = AT(rand(100, 100))
+    b = AT(rand(100, 100))
+    is_single_cpu_thread =
+        device isa ClimaComms.CPUSingleThreaded &&
+        context isa ClimaComms.SingletonCommsContext
+
+    threaded_deriv3_with_respect_to_i!(device, a_threaded, b)
+    unthreaded_deriv3_with_respect_to_i!(device, a_unthreaded, b)
+    @test a_threaded == a_unthreaded
+
+    # TODO: Figure out source of allocations for interdependent iterators.
+    threaded_allocations =
+        @allocated threaded_deriv3_with_respect_to_i!(device, a_threaded, b)
+    @info "Allocated $threaded_allocations bytes"
+    is_single_cpu_thread && @test_broken threaded_allocations == 0
 end
 
 import Adapt
