@@ -263,6 +263,104 @@ end
     @test a == 5 * b
 end
 
+@testset "threaded with lazy iterators" begin
+    a = AT(rand(100))
+    b = AT(rand(100))
+
+    kernel1!(a, b) = ClimaComms.@threaded device for (i, b_i) in enumerate(b)
+        a[i] = b_i
+    end
+    kernel1!(a, b)
+    @test a == b
+
+    kernel2!(a, b) = ClimaComms.@threaded device begin
+        for ((i, b_i), b_i′) in zip(enumerate(b), b)
+            a[i] = b_i + b_i′
+        end
+    end
+    kernel2!(a, b)
+    @test a == 2 * b
+
+    kernel3!(a, b) = ClimaComms.@threaded device begin
+        for (i, b_reversed_i) in enumerate(Iterators.reverse(b))
+            a[length(b) - i + 1] = 3 * b_reversed_i
+        end
+    end
+    kernel3!(a, b)
+    @test a == 3 * b
+
+    kernel4!(a, b) = ClimaComms.@threaded device begin
+        for (i, b_i_times_4) in enumerate(4 * b_i for b_i in b)
+            a[i] = b_i_times_4
+        end
+    end
+    kernel4!(a, b)
+    @test a == 4 * b
+
+    kernel5!(a, b) = ClimaComms.@threaded device begin
+        for (i′, (b_i, i)) in enumerate(Iterators.product(b, axes(a, 1)))
+            if i′ == length(b) * (i - 1) + i
+                a[i] = 5 * b_i
+            end
+        end
+    end
+    kernel5!(a, b)
+    @test a == 5 * b
+
+    kernel6!(a, b) = ClimaComms.@threaded device begin
+        for (i′, b_i) in enumerate(Iterators.flatten((b, b)))
+            i = i′ <= length(b) ? i′ : i′ - length(b)
+            if (iseven(i) && i′ <= length(b)) || (isodd(i) && i′ > length(b))
+                a[i] = 6 * b_i
+            end
+        end
+    end
+    kernel6!(a, b)
+    @test a == 6 * b
+
+    kernel7!(a, b) = ClimaComms.@threaded device begin
+        for is_and_b_is in Iterators.partition(enumerate(b), 3)
+            for (i, b_i) in is_and_b_is
+                a[i] = 7 * b_i
+            end
+        end
+    end
+    kernel7!(a, b)
+    @test a == 7 * b
+end
+
+@testset "threaded with multiple iterators" begin
+    a = AT(rand(100, 1000))
+    b1 = AT(rand(100))
+    b2 = AT(rand(1000))
+
+    kernel1!(a, b1, b2) = ClimaComms.@threaded device begin
+        for i in axes(a, 1), j in axes(a, 2)
+            a[i, j] = b1[i] * b2[j]
+        end
+    end
+    kernel1!(a, b1, b2)
+    @test a == b1 * b2'
+
+    kernel2!(a, b1, b2) = ClimaComms.@threaded device begin
+        for (i, b1_i) in enumerate(b1), (j, b2_j) in enumerate(b2)
+            a[i, j] = 2 * b1_i * b2_j
+        end
+    end
+    kernel2!(a, b1, b2)
+    @test a == 2 * b1 * b2'
+
+    kernel3!(a, b1, b2) = ClimaComms.@threaded device begin
+        for (i, b1_i) in enumerate(b1), (j, b2_j) in enumerate(b2), b2_j′ in b2
+            if b2_j == b2_j′
+                a[i, j] = 3 * b1_i * b2_j
+            end
+        end
+    end
+    kernel3!(a, b1, b2)
+    @test a == 3 * b1 * b2'
+end
+
 import Adapt
 @testset "Adapt" begin
     @test Adapt.adapt(Array, ClimaComms.CUDADevice()) ==
@@ -295,3 +393,5 @@ end
 @testset "Logging" begin
     include("logging.jl")
 end
+
+include("threaded_benchmark.jl")
