@@ -4,6 +4,10 @@ ClimaComms.jl Release Notes
 main
 -------
 
+v0.6.8
+-------
+- Extended `@threaded` to work with multiple iterators and lazy iterators (e.g., `enumerate`, `zip`, and `Iterators.partition`), and modified the `threaded` function to make it equivalent to `@threaded` [PR 115](https://github.com/CliMA/ClimaComms.jl/pull/115).
+
 v0.6.7
 -------
 - Extended `@threaded` to work on GPU devices, with block sizes automatically determined by the CUDA occupancy API, and added the ability to control thread coarsening across all devices [PR 111](https://github.com/CliMA/ClimaComms.jl/pull/111).
