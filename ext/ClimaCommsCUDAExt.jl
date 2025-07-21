@@ -35,6 +35,8 @@ Adapt.adapt_structure(
 ) = ClimaComms.CUDADevice()
 
 ClimaComms.array_type(::CUDADevice) = CUDA.CuArray
+ClimaComms.free_memory(::CUDADevice) = CUDA.free_memory()
+ClimaComms.total_memory(::CUDADevice) = CUDA.total_memory()
 ClimaComms.allowscalar(f, ::CUDADevice, args...; kwargs...) =
     CUDA.@allowscalar f(args...; kwargs...)
 

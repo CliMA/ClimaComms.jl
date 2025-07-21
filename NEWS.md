@@ -4,6 +4,10 @@ ClimaComms.jl Release Notes
 main
 -------
 
+v0.6.9
+-------
+- Added a device-agnostic API for querying available memory [PR 117](https://github.com/CliMA/ClimaComms.jl/pull/117).
+
 v0.6.8
 -------
 - Extended `@threaded` to work with multiple iterators and lazy iterators (e.g., `enumerate`, `zip`, and `Iterators.partition`), and modified the `threaded` function to make it equivalent to `@threaded` [PR 115](https://github.com/CliMA/ClimaComms.jl/pull/115).
