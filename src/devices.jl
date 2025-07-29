@@ -103,6 +103,20 @@ Currently used to assign CUDADevices to MPI ranks.
 _assign_device(device, id) = nothing
 
 """
+    ClimaComms.free_memory(device)
+
+Bytes of memory that are currently available for allocation on the `device`.
+"""
+free_memory(::AbstractCPUDevice) = Sys.free_memory()
+
+"""
+    ClimaComms.total_memory(device)
+
+Bytes of memory that are theoretically available for allocation on the `device`.
+"""
+total_memory(::AbstractCPUDevice) = Sys.total_memory()
+
+"""
     @time f(args...; kwargs...)
 
 Device-flexible `@time`:
