@@ -27,6 +27,8 @@ ClimaComms.CUDADevice
 ClimaComms.device
 ClimaComms.device_functional
 ClimaComms.array_type
+ClimaComms.free_memory
+ClimaComms.total_memory
 ClimaComms.allowscalar
 ClimaComms.@time
 ClimaComms.@elapsed
@@ -34,10 +36,32 @@ ClimaComms.@assert
 ClimaComms.@sync
 ClimaComms.@cuda_sync
 Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractDevice)
+```
+
+## Threading
+
+```@docs
 ClimaComms.@threaded
+ClimaComms.@shmem_threaded
 ClimaComms.threaded
 ClimaComms.threadable
-ClimaComms.ThreadableWrapper
+ClimaComms.synchronize_shmem!
+ClimaComms.syncable
+ClimaComms.unsync
+ClimaComms.auto_synchronize!
+ClimaComms.static_resize
+ClimaComms.shmem_array
+ClimaComms.shmem_map!
+ClimaComms.shmem_reduce!
+ClimaComms.shmem_mapreduce!
+ClimaComms.shmem_any!
+ClimaComms.shmem_all!
+ClimaComms.shmem_sum!
+ClimaComms.shmem_prod!
+ClimaComms.shmem_maximum!
+ClimaComms.shmem_minimum!
+ClimaComms.@unique_shmem_thread
+ClimaComms.unique_shmem_thread
 ```
 
 ## Contexts
