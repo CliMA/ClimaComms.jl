@@ -15,13 +15,13 @@ cpu_threaded(f::F, ::CPUSingleThreaded, itr, _) where {F} =
         f(item)
     end
 
-cpu_threaded(f::F, ::CPUMultiThreaded, itr, ::Val{:dynamic}) where {F} =
-    Threads.@threads :dynamic for item in itr
+cpu_threaded(f::F, ::CPUMultiThreaded, itr, ::Nothing) where {F} =
+    Threads.@threads :static for item in itr
         f(item)
     end
 
-cpu_threaded(f::F, ::CPUMultiThreaded, itr, ::Val{:static}) where {F} =
-    Threads.@threads :static for item in itr
+cpu_threaded(f::F, ::CPUMultiThreaded, itr, ::Val{:dynamic}) where {F} =
+    Threads.@threads :dynamic for item in itr
         f(item)
     end
 

@@ -365,6 +365,6 @@ assert(::AbstractCPUDevice, cond::C, text::T) where {C, T} =
 
 include("threaded.jl")
 include("threadable.jl")
-include("syncable.jl")
+include("shareable.jl")
 include("cpu_threaded.jl")
 include("cpu_shmem.jl")

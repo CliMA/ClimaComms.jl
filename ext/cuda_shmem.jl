@@ -1,76 +1,128 @@
-# Number of threads in each warp of kernel being executed.
-threads_in_warp() = CUDA.warpsize()
+sync_threads_in_block() = CUDA.sync_threads()
 
-ClimaComms.synchronize_shmem!(::CUDADevice) = CUDA.sync_threads()
+ClimaComms.needs_metadata_to_unroll_shmem_loops(::CUDADevice) = true
 
-ClimaComms.shmem_array_on_device(::CUDADevice, ::Type{T}, dims...) where {T} =
+ClimaComms.sync_shmem_threads!(::CUDADevice) = sync_threads_in_block()
+
+ClimaComms.shmem_thread_indices(::CUDADevice, itr) =
+    thread_idx_in_block():threads_in_block():length(itr)
+
+@generated function ClimaComms.unrolled_shmem_thread_indices(
+    ::CUDADevice,
+    ::Val{n_items},
+    ::Val{metadata},
+) where {n_items, metadata}
+    block_size = metadata.threads_in_block
+    thread_index_expr = :(thread_index = thread_idx_in_block())
+    if n_items <= block_size
+        indices_expr = :((thread_index,))
+    elseif n_items % block_size != 0
+        indices_expr = :(thread_index:($block_size):($n_items))
+    else
+        index_func_expr = :(i -> (i - Int32(1)) * $block_size + thread_index)
+        indices_expr = :(ntuple($index_func_expr, Val($(n_items ÷ block_size))))
+    end
+    return :($thread_index_expr; $indices_expr)
+end
+
+ClimaComms.unwrapped_shmem_array(::CUDADevice, ::Type{T}, dims) where {T} =
     StaticArrays.SizedArray{Tuple{dims...}}(CUDA.CuStaticSharedArray(T, dims))
 
-function ClimaComms.shmem_map_on_device!(
-    f::F,
-    ::CUDADevice,
-    dest_array,
-    src_array,
-) where {F}
-    length(dest_array) != length(src_array) &&
-        throw(ArgumentError("Destination and source must have the same length"))
-    isempty(src_array) && return nothing
-
-    n_indices = length(src_array)
-    for map_index in thread_idx_in_block():threads_in_block():n_indices
-        @inbounds dest_array[map_index] = f(src_array[map_index])
-    end
-    n_indices > threads_in_warp() && ClimaComms.auto_synchronize!(src_array)
+function ClimaComms.unique_shmem_thread(f::F, ::CUDADevice) where {F}
+    thread_idx_in_block() == 1 && f()
     return nothing
 end
 
-function ClimaComms.shmem_reduce_on_device!(
-    op::O,
-    device::CUDADevice,
-    array;
-    init...,
-) where {O}
-    @assert keys(init) in ((), (:init,))
-    if isempty(array)
-        isempty(init) &&
-            throw(ArgumentError("Reduction of empty array requires init value"))
-        return values(init)[1]
-    end
-
-    n_indices = length(array)
+function ClimaComms.reduce_in_place!(op::O, ::CUDADevice, itr) where {O}
+    n_items = length(itr)
     warp_size = threads_in_warp()
     block_size = threads_in_block()
-    reduction_index = thread_idx_in_block()
+    thread_index = thread_idx_in_block()
 
-    if n_indices <= block_size
-        n_remaining_inputs = n_indices
-    else
-        @inbounds reduced_value = array[reduction_index]
-        for input_index in (reduction_index + block_size):block_size:n_indices
-            @inbounds reduced_value = op(reduced_value, array[input_index])
+    if n_items > block_size
+        @inbounds reduced_value = itr[thread_index]
+        input_index = thread_index + block_size
+        while input_index <= n_items
+            @inbounds reduced_value = op(reduced_value, itr[input_index])
+            input_index += block_size
         end
-        @inbounds array[reduction_index] = reduced_value
-        block_size > warp_size && ClimaComms.synchronize_shmem!(device)
-        n_remaining_inputs = block_size
+        @inbounds itr[thread_index] = reduced_value
+        block_size > warp_size && sync_threads_in_block()
     end
 
+    n_remaining_inputs = min(n_items, block_size)
     while n_remaining_inputs > 1
-        n_reductions = n_remaining_inputs >> 1 # >>1 is a bitwise version of ÷2
+        n_reductions = n_remaining_inputs >> Int32(1) # bitwise version of ÷ 2
         n_remaining_inputs -= n_reductions
-        if reduction_index <= n_reductions
-            second_input_index = reduction_index + n_remaining_inputs
-            @inbounds array[reduction_index] =
-                op(array[reduction_index], array[second_input_index])
+        if thread_index <= n_reductions
+            second_input_index = thread_index + n_remaining_inputs
+            @inbounds itr[thread_index] =
+                op(itr[thread_index], itr[second_input_index])
         end
-        n_reductions > warp_size && ClimaComms.synchronize_shmem!(device)
+        n_reductions > warp_size && sync_threads_in_block()
     end
-
-    ClimaComms.auto_synchronize!(array)
-    return @inbounds isempty(init) ? array[1] : op(values(init)[1], array[1])
 end
 
-ClimaComms.unique_shmem_thread_on_device(f::F, ::CUDADevice) where {F} =
-    thread_idx_in_block() == 1 && f()
+@generated function ClimaComms.unrolled_reduce_in_place!(
+    op::O,
+    ::CUDADevice,
+    itr,
+    ::Val{n_items},
+    ::Val{metadata},
+) where {O, n_items, metadata}
+    warp_size = metadata.threads_in_warp
+    block_size = metadata.threads_in_block
 
-# TODO: Implement unrolled versions of shmem_map! and shmem_reduce!, which will
-# require storing the warp_size and block_size as type parameters of the array.
+    function_body_expr = quote
+        thread_index = thread_idx_in_block()
+    end
+    sync_expr = :(sync_threads_in_block())
+
+    if n_items > block_size
+        if n_items % block_size != 0
+            reduced_value_update_expr = quote
+                input_index = thread_index + $block_size
+                while input_index <= $n_items
+                    @inbounds reduced_value =
+                        op(reduced_value, itr[input_index])
+                    input_index += $block_size
+                end
+            end
+        else
+            reduced_value_update_expr = quote
+                Base.Cartesian.@nexprs $(n_items ÷ block_size - 1) i ->
+                    begin
+                        input_index = i * $block_size + thread_index
+                        @inbounds reduced_value =
+                            op(reduced_value, itr[input_index])
+                    end
+            end
+        end
+        initial_reduction_expr = quote
+            @inbounds reduced_value = itr[thread_index]
+            $reduced_value_update_expr
+            @inbounds itr[thread_index] = reduced_value
+        end
+        push!(function_body_expr.args, initial_reduction_expr)
+        block_size > warp_size && push!(function_body_expr.args, sync_expr)
+    end
+
+    n_remaining_inputs = min(n_items, block_size)
+    while n_remaining_inputs > 1
+        n_reductions = n_remaining_inputs ÷ 2
+        n_remaining_inputs -= n_reductions
+        next_reduction_expr = quote
+            if thread_index <= $n_reductions
+                second_input_index = thread_index + $n_remaining_inputs
+                @inbounds itr[thread_index] =
+                    op(itr[thread_index], itr[second_input_index])
+            end
+        end
+        push!(function_body_expr.args, next_reduction_expr)
+        n_reductions > warp_size && push!(function_body_expr.args, sync_expr)
+    end
+
+    return function_body_expr
+end
+
+# TODO: Check whether using UnrolledUtilities can reduce latency.

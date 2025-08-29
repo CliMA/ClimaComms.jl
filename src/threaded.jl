@@ -26,8 +26,8 @@ manually, with the following device-dependent behavior:
         evaluating iterations in each thread until the loop is completed (only
         available as of Julia 1.11).
    Setting `coarsen` to `:dynamic` or `:greedy` launches threads with those
-   schedulers. Setting it to `:static` or an integer value launches threads with
-   static scheduling (using `:static` is similar to using `1`, but slightly more
+   schedulers. Setting it to `nothing` or an integer value launches threads with
+   static scheduling (using `nothing` is similar to using `1`, but slightly more
    performant). To read more about multi-threading, see the documentation for
    [`Threads.@threads`](https://docs.julialang.org/en/v1/base/multi-threading/#Base.Threads.@threads).
 
@@ -170,6 +170,15 @@ macro threaded(args...)
         Meta.isexpr(loop_assignments_expr, :block) ?
         loop_assignments_expr.args : Any[loop_assignments_expr]
 
+    function drop_continues_from_outer_loop_body(expr)
+        Meta.isexpr(expr, :continue) && return :(return)
+        (Meta.isexpr(expr, :while) || Meta.isexpr(expr, :for)) && return expr
+        !(expr isa Expr) && return expr
+        new_args = Base.mapany(drop_continues_from_outer_loop_body, expr.args)
+        return Expr(expr.head, new_args...)
+    end
+    function_body_expr = drop_continues_from_outer_loop_body(loop_body_expr)
+
     # Reverse the order of iterators to match standard for-loop behavior:
     # for-loops go from outermost iterator to innermost iterator, whereas
     # Iterators.product goes from innermost iterator to outermost iterator.
@@ -201,7 +210,7 @@ macro threaded(args...)
         device = $(esc(device_expr))
         device isa CPUSingleThreaded ? $(esc(single_threaded_expr)) :
         threaded(
-            ($(Base.mapany(esc, var_exprs)...),) -> $(esc(loop_body_expr)),
+            ($(Base.mapany(esc, var_exprs)...),) -> $(esc(function_body_expr)),
             device,
             $(Base.mapany(esc, itr_exprs)...);
             $(Base.mapany(esc, kwarg_exprs)...),
@@ -223,8 +232,8 @@ outer_iterator_2 = ...
     @shmem_threaded inner_iterator = ...
     for outer_item_1 in outer_iterator_1, outer_item_2 in outer_iterator_2, ...
         ...
-        array_1 = shmem_array(device, ...)
-        array_2 = shmem_array(device, ...)
+        array_1 = shmem_array(inner_iterator, ...)
+        array_2 = shmem_array(inner_iterator, ...)
         ...
         for inner_item in inner_iterator
             <write to arrays based on inner and outer loop items>
@@ -270,16 +279,15 @@ end
 
 Since an iterator annotated with `@shmem_threaded` can be used to read data from
 shared memory arrays, every loop and reduction over the iterator is followed by
-a call to [`auto_synchronize!`](@ref) on GPU devices, ensuring that shared
-memory reads are consistent across threads.
+a call to [`auto_sync!`](@ref) on GPU devices, ensuring that shared memory reads
+are consistent across threads.
 
 When synchronization is not needed after a loop over an iterator annotated with
-`@shmem_threaded`, it can be disabled using [`unsync`](@ref). This can always be
-done for the last such loop in a `@threaded` expression, since there are no
-subsequent loops that require consistency of shared memory reads. Every other
-loop over a `@shmem_threaded` iterator that does not write data to shared memory
-arrays should also be modified in this manner, since unnecessary synchronization
-pauses can degrade performance.
+`@shmem_threaded`, it can be disabled using [`disable_auto_sync`](@ref). This
+can always be done for, e.g., the last such loop in a `@threaded` expression,
+since there are no subsequent loops that require consistency of shared memory.
+In general, `disable_auto_sync` should be called whenever doing so preserves
+correctness because unnecessary synchronization pauses can degrade performance.
 
 Since each GPU thread processes a subset of the elements in an iterator
 annotated with `@shmem_threaded`, functions that are meant to process the entire
@@ -287,11 +295,11 @@ iterator, like `sum` and `minimum`, would not generate valid results for its
 subsets. If functions like this need to be evaluated, their results should
 always be precomputed before `@threaded` loops.
 
-When the `size` or `length` of an iterator annotated with `@shmem_threaded` is
-used to compute the dimensions of a [`shmem_array`](@ref), it must be inferrable
-during compilation to avoid unnecessary runtime allocations. If this is not
-already the case, [`static_resize`](@ref) can be used to assign the iterator a
-static size.
+When the `size` of an iterator annotated with `@shmem_threaded` is used to
+compute the dimensions of a [`shmem_array`](@ref), it must be inferrable during
+compilation to avoid unnecessary runtime allocations. See
+[`StaticArrays.jl`](https://github.com/JuliaArrays/StaticArrays.jl) for how to
+construct statically-sized analogues of ranges and arrays.
 """
 macro shmem_threaded end
 
@@ -336,7 +344,8 @@ are eliminated without any intermediate function calls, so the expressions with
 macros will typically compile slightly faster than the `threaded` function. On
 other devices, the only differences between the macro expressions and the
 `threaded` function are syntactic:
- - the body of the `@threaded` loop is specified as a function,
+ - the body of the `@threaded` loop is specified as a function, with `return`
+   used in place of `continue`,
  - the `@shmem_threaded` iterator is specified as a keyword argument,
  - every symbol used as a keyword argument is wrapped in a `Val`, e.g., `:auto`
    is specified as `Val(:auto)`.
@@ -349,18 +358,26 @@ function threaded(
     device,
     itr;
     shmem_threaded = nothing,
-    coarsen = Val(:dynamic),
-    shmem_coarsen = Val(:auto),
-    block_size = Val(:auto),
-    verbose = false,
+    coarsen = nothing,
+    shmem_coarsen = nothing,
+    block_size = nothing,
+    debug = nothing,
 ) where {F}
-    (coarsen isa Val || coarsen isa Integer && coarsen > 0) ||
-        throw(ArgumentError("`coarsen` is not positive"))
-    (shmem_coarsen isa Val || shmem_coarsen isa Integer && shmem_coarsen > 0) ||
-        throw(ArgumentError("`shmem_coarsen` is not positive"))
-    (block_size isa Val || block_size isa Integer && block_size > 0) ||
-        throw(ArgumentError("`block_size` is not positive"))
-    verbose isa Bool || throw(ArgumentError("`verbose` is not a Bool"))
+    isnothing(coarsen) ||
+        (coarsen isa Integer && coarsen > 0) ||
+        coarsen in (Val(:dynamic), Val(:greedy)) ||
+        throw(ArgumentError("coarsen is not a positive Integer or one of the \
+                             symbols :dynamic or :greedy"))
+    isnothing(shmem_coarsen) ||
+        (shmem_coarsen isa Integer && shmem_coarsen > 0) ||
+        throw(ArgumentError("shmem_coarsen is not a positive Integer"))
+    isnothing(block_size) ||
+        (block_size isa Integer && block_size > 0) ||
+        throw(ArgumentError("block_size is not a positive Integer"))
+    isnothing(debug) ||
+        debug in (Val(:warn), Val(:llvm), Val(:ptx), Val(:sass), Val(:stats)) ||
+        throw(ArgumentError("debug is not one of the symbols :warn, :llvm, \
+                             :ptx, :sass, or :stats"))
     threadable_itr = threadable(device, itr)
     isempty(threadable_itr) && return nothing
     threaded_on_device(
@@ -371,7 +388,7 @@ function threaded(
         coarsen,
         shmem_coarsen,
         block_size,
-        verbose,
+        debug,
     )
 end
 

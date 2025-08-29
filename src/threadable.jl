@@ -3,7 +3,7 @@
 
 Modifies one or more iterators so that they each have the following properties:
  - a concrete element type
- - a well-defined `length`, with corresponding methods for `size` and `isempty`
+ - a well-defined `length`, and a corresponding method for `isempty`
  - support for linear indexing through `getindex`, with `firstindex` set to 1
 When no specialized method of `threadable` is defined for some iterator type, an
 error will be thrown if the iterator does not already have these properties.
@@ -31,7 +31,6 @@ threadable(device, itrs...) = map(Base.Fix1(threadable, device), itrs)
 abstract type ThreadableIterator end
 Base.firstindex(::ThreadableIterator) = 1
 Base.lastindex(itr::ThreadableIterator) = length(itr)
-Base.size(itr::ThreadableIterator) = (length(itr),)
 Base.isempty(itr::ThreadableIterator) = length(itr) == 0
 
 struct ThreadableGenerator{F, I} <: ThreadableIterator

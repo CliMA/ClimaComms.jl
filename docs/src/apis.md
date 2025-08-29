@@ -45,13 +45,14 @@ ClimaComms.@threaded
 ClimaComms.@shmem_threaded
 ClimaComms.threaded
 ClimaComms.threadable
-ClimaComms.synchronize_shmem!
-ClimaComms.syncable
-ClimaComms.unsync
-ClimaComms.auto_synchronize!
-ClimaComms.static_resize
+ClimaComms.shareable
+ClimaComms.set_metadata
+ClimaComms.disable_auto_sync
+ClimaComms.auto_sync!
+ClimaComms.sync_shmem_threads!
 ClimaComms.shmem_array
-ClimaComms.shmem_map!
+ClimaComms.@unique_shmem_thread
+ClimaComms.unique_shmem_thread
 ClimaComms.shmem_reduce!
 ClimaComms.shmem_mapreduce!
 ClimaComms.shmem_any!
@@ -60,8 +61,6 @@ ClimaComms.shmem_sum!
 ClimaComms.shmem_prod!
 ClimaComms.shmem_maximum!
 ClimaComms.shmem_minimum!
-ClimaComms.@unique_shmem_thread
-ClimaComms.unique_shmem_thread
 ```
 
 ## Contexts

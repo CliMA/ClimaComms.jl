@@ -1,21 +1,40 @@
-synchronize_shmem!(::AbstractCPUDevice) = nothing
+needs_metadata_to_unroll_shmem_loops(::AbstractCPUDevice) = false
 
-shmem_array_on_device(::AbstractCPUDevice, ::Type{T}, dims...) where {T} =
+shmem_thread_indices(::AbstractCPUDevice, itr) = Base.OneTo(length(itr))
+
+unrolled_shmem_thread_indices(::AbstractCPUDevice, ::Val{N}) where {N} =
+    StaticArrays.SOneTo(N)
+
+unwrapped_shmem_array(::AbstractCPUDevice, ::Type{T}, dims) where {T} =
     StaticArrays.MArray{Tuple{dims...}, T}(undef)
 
-shmem_map_on_device!(f::F, ::AbstractCPUDevice, arrays...) where {F} =
-    map!(f, map(unwrap, arrays)...)
+unique_shmem_thread(f::F, ::AbstractCPUDevice) where {F} = f()
 
-shmem_reduce_on_device!(op::O, ::AbstractCPUDevice, array; init...) where {O} =
-    Base.reduce(op, unwrap(array); init...)
+reduce_on_device!(op::O, ::AbstractCPUDevice, itr; init...) where {O} =
+    Base.reduce(op, unwrap(itr); init...)
 
-shmem_mapreduce_on_device!(
+reduce_on_device!(op::O, ::AbstractCPUDevice, dest, itr; init...) where {O} =
+    dest[] = Base.reduce(op, unwrap(itr); init...)
+
+mapreduce_on_device!(
     f::F,
     op::O,
     ::AbstractCPUDevice,
-    cache,
-    arrays...;
+    itr;
     init...,
-) where {F, O} = mapreduce(f, op, map(unwrap, arrays)...; init...)
+) where {F, O} = mapreduce(f, op, unwrap(itr); init...)
 
-unique_shmem_thread_on_device(f::F, ::AbstractCPUDevice) where {F} = f()
+mapreduce_on_device!(
+    f::F,
+    op::O,
+    ::AbstractCPUDevice,
+    dest,
+    itr;
+    init...,
+) where {F, O} = dest[] = mapreduce(f, op, unwrap(itr); init...)
+
+reduce_in_place!(_, device::AbstractCPUDevice, _) =
+    error("reduce_in_place! is not supported on $device devices")
+
+unrolled_reduce_in_place!(_, device::AbstractCPUDevice, _, _) =
+    error("unrolled_reduce_in_place! is not supported on $device devices")
