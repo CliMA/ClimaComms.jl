@@ -76,25 +76,32 @@ block_size_limit(max_threads_in_block, _) = max_threads_in_block
 compiled_kernel(kernel_function::F) where {F} =
     CUDA.@cuda always_inline=true launch=false kernel_function()
 
-kernel_config_limits(kernel, block_size) =
-    (grid_size_limit(kernel), block_size_limit(block_size, kernel))
-
-print_debug_info(::Nothing, _, _, _) = nothing
-print_debug_info(::Val{:warn}, kernel, _, _) =
-    CUDA.@device_code_warntype kernel()
-print_debug_info(::Val{:llvm}, kernel, _, _) = CUDA.@device_code_llvm kernel()
-print_debug_info(::Val{:ptx}, kernel, _, _) = CUDA.@device_code_ptx kernel()
-print_debug_info(::Val{:sass}, kernel, _, _) = CUDA.@device_code_sass kernel()
-print_debug_info(::Val{:stats}, kernel, n_blocks, threads_in_block) =
+print_debug_info(::Nothing, _, _) = nothing
+print_debug_info(::Val{:warn}, kernel_function::F, _) where {F} =
+    CUDA.@device_code_warntype compiled_kernel(kernel_function)
+print_debug_info(::Val{:llvm}, kernel_function::F, _) where {F} =
+    CUDA.@device_code_llvm compiled_kernel(kernel_function)
+print_debug_info(::Val{:ptx}, kernel_function::F, _) where {F} =
+    CUDA.@device_code_ptx compiled_kernel(kernel_function)
+print_debug_info(::Val{:sass}, kernel_function::F, _) where {F} =
+    CUDA.@device_code_sass compiled_kernel(kernel_function)
+print_debug_info(::Val{:stats}, kernel_function::F, kernel) where {F} =
     @info """Kernel Statistics:
              $(4 * CUDA.registers(kernel)) bytes of register memory,
              $(CUDA.memory(kernel).local) bytes of register spillover,
              $(CUDA.memory(kernel).shared) bytes of shared memory,
-             $n_blocks blocks,
-             $threads_in_block threads in each block,
              $(CUDA.maxthreads(kernel)) maximum threads per block"""
 # TODO: Add relevant statistics about compiled code, e.g., the number of
 # conditional branches, or the number of double precision operations.
+
+function compiled_and_debugged_kernel(kernel_function::F, debug) where {F}
+    kernel = compiled_kernel(kernel_function)
+    print_debug_info(debug, kernel_function, kernel)
+    return kernel
+end
+
+kernel_config_limits(kernel, block_size) =
+    (grid_size_limit(kernel), block_size_limit(block_size, kernel))
 
 # TODO: Modify loops to avoid using StepRange on GPUs:
 # https://cuda.juliagpu.org/stable/tutorials/performance/#Avoiding-StepRange
@@ -104,13 +111,13 @@ function cuda_threaded(f::F, itr, coarsen, block_size, debug) where {F}
     is_coarsened = coarsen isa Integer
 
     if is_coarsened
-        kernel = compiled_kernel() do
+        kernel = compiled_and_debugged_kernel(debug) do
             for item_index in thread_idx_in_kernel():threads_in_kernel():n_items
                 @inbounds f(itr[item_index])
             end
         end
     else
-        kernel = compiled_kernel() do
+        kernel = compiled_and_debugged_kernel(debug) do
             item_index = thread_idx_in_kernel()
             item_index <= n_items && @inbounds f(itr[item_index])
             nothing
@@ -130,8 +137,7 @@ function cuda_threaded(f::F, itr, coarsen, block_size, debug) where {F}
     threads_in_block = min(max_required_threads_in_kernel, max_threads_in_block)
     n_blocks = cld(n_items, items_in_thread * threads_in_block)
 
-    print_debug_info(debug, kernel, n_blocks, threads_in_block)
-    kernel(; blocks = n_blocks, threads = threads_in_block)
+    CUDA.@sync kernel(; blocks = n_blocks, threads = threads_in_block)
 end
 
 function cuda_threaded(
@@ -150,13 +156,13 @@ function cuda_threaded(
 
     compiled_kernel_with_shmem(shmem_itr) =
         if is_coarsened
-            compiled_kernel() do
+            compiled_and_debugged_kernel(debug) do
                 for item_index in block_idx():blocks_in_kernel():n_items
                     @inbounds f(itr[item_index], shmem_itr)
                 end
             end
         else
-            compiled_kernel() do
+            compiled_and_debugged_kernel(debug) do
                 item_index = block_idx()
                 item_index <= n_items && @inbounds f(itr[item_index], shmem_itr)
                 nothing
@@ -195,14 +201,13 @@ function cuda_threaded(
         min_shmem_items_in_thread : cld(n_shmem_items, max_threads_in_block)
     threads_in_block = cld(n_shmem_items, shmem_items_in_thread)
 
+    CUDA.@sync kernel(; blocks = n_blocks, threads = threads_in_block)
+
+    # TODO: Use the unrolled kernel.
     # metadata = (; threads_in_warp = warp_size(kernel), threads_in_block)
     # unrollable_shmem_itr = ClimaComms.set_metadata(shmem_itr, metadata)
     # unrolled_kernel = compiled_kernel_with_shmem(unrollable_shmem_itr)
-    unrolled_kernel = kernel # TODO: Use the actual unrolled kernel.
 
     # TODO: Check if the launch config is still optimal for the unrolled kernel.
     # TODO: Add an optimization mode that iteratively updates the launch config.
-
-    print_debug_info(debug, unrolled_kernel, n_blocks, threads_in_block)
-    CUDA.@sync unrolled_kernel(; blocks = n_blocks, threads = threads_in_block)
 end

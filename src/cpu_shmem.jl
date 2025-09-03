@@ -1,9 +1,13 @@
 needs_metadata_to_unroll_shmem_loops(::AbstractCPUDevice) = false
 
-shmem_thread_indices(::AbstractCPUDevice, itr) = Base.OneTo(length(itr))
+sync_shmem_threads!(::AbstractCPUDevice) = nothing
 
-unrolled_shmem_thread_indices(::AbstractCPUDevice, ::Val{N}) where {N} =
-    StaticArrays.SOneTo(N)
+shmem_thread_indices(::AbstractCPUDevice, n_items) = Base.OneTo(n_items)
+
+unrolled_shmem_thread_indices(
+    ::AbstractCPUDevice,
+    ::Val{n_items},
+) where {n_items} = StaticArrays.SOneTo(n_items)
 
 unwrapped_shmem_array(::AbstractCPUDevice, ::Type{T}, dims) where {T} =
     StaticArrays.MArray{Tuple{dims...}, T}(undef)

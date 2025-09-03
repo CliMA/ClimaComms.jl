@@ -172,7 +172,7 @@ Internal function called by [`auto_sync!`](@ref) for [`shareable`](@ref)
 iterators whose `auto_sync` flags are set to `true`. Non-standard operations
 with loops or reductions may require explicit calls to `sync_shmem_threads!`.
 """
-sync_shmem_threads!(_) = nothing
+function sync_shmem_threads! end
 
 Base.IteratorEltype(::Type{T}) where {T <: ShareableIterator} =
     Base.IteratorEltype(unwrap_type(T))
@@ -202,15 +202,15 @@ Base.similar(itr::ShareableIterator, ::Type{T}, dims...) where {T} =
 Base.eachindex(style, itr::ShareableIterator) =
     auto_unroll_enabled(itr) ?
     unrolled_shmem_thread_indices(inferred_device(itr), unroll_vals(itr)...) :
-    shmem_thread_indices(inferred_device(itr), unwrap(itr))
+    shmem_thread_indices(inferred_device(itr), length(itr))
 
 function Base.iterate(itr::ShareableIterator, state...)
-    index_and_state = iterate(eachindex(itr), state...)
-    if isnothing(index_and_state)
+    index_and_next_state = iterate(eachindex(itr), state...)
+    if isnothing(index_and_next_state)
         auto_sync!(itr)
         return nothing
     end
-    return @inbounds (itr[index_and_state[1]], index_and_state[2])
+    return @inbounds (itr[index_and_next_state[1]], index_and_next_state[2])
 end
 
 Base.map(f::F, args::ShareableIterator...) where {F} = f.(args...)

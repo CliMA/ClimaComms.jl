@@ -70,8 +70,8 @@ Base.@propagate_inbounds nth_deriv_along_x_axis(a, n) =
 Base.@propagate_inbounds deriv_along_x_axis(a) = nth_deriv_along_x_axis(a, 1)
 
 ref_array_copy!(a_copy, a, device) = ClimaComms.@cuda_sync device a_copy .= a
-threaded_array_copy!(a_copy, a, device) = ClimaComms.@cuda_sync device begin
-    ClimaComms.@threaded device for y in axes(a, 2), x in axes(a, 1)
+threaded_array_copy!(a_copy, a, device) = ClimaComms.@threaded device begin
+    for y in axes(a, 2), x in axes(a, 1)
         @inbounds a_copy[x, y] = a[x, y]
     end
 end
@@ -95,8 +95,8 @@ end
 
 ref_array_max!(a_max, a, device) =
     ClimaComms.@cuda_sync device maximum!(reshape(a_max, 1, :), a)
-threaded_array_max!(a_max, a, device) = ClimaComms.@cuda_sync device begin
-    ClimaComms.@threaded device begin
+threaded_array_max!(a_max, a, device, debug) =
+    ClimaComms.@threaded device debug=debug begin
         ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
         for y in axes(a, 2)
             a_col = ClimaComms.shmem_array(X, eltype(a))
@@ -105,13 +105,19 @@ threaded_array_max!(a_max, a, device) = ClimaComms.@cuda_sync device begin
             ClimaComms.shmem_maximum!(a_col_max, a_col)
         end
     end
-end
+threaded_array_max!(a_max, a, device) =
+    threaded_array_max!(a_max, a, device, nothing)
 
 println()
 @info "Benchmarking max along 1st axis of $x_max×$y_max matrix:"
 a_max_ref = a[1, :]
 a_max_threaded = a[1, :]
 reads_and_writes_for_max = sizeof(a) + sizeof(a_max_ref)
+for (debug_sym, debug_str) in ((:warn, "Julia"), (:llvm, "LLVM"), (:ptx, "PTX"))
+    println()
+    @info "$debug_str code for max along 1st axis of matrix:"
+    threaded_array_max!(a_max_threaded, a, device, Val(debug_sym))
+end
 for (array_max!, info_string, a_max) in (
     (ref_array_max!, "reference max", a_max_ref),
     (threaded_array_max!, "@threaded max", a_max_threaded),
@@ -128,63 +134,56 @@ ref_deriv!(∂ⁿa∂xⁿ, a, device, n, cartesian_indices) =
     ClimaComms.@cuda_sync device begin
         ∂ⁿa∂xⁿ .= nth_deriv_along_x_axis(a, n).(cartesian_indices)
     end
-threaded_deriv_1!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@cuda_sync device begin
+threaded_deriv_1!(∂ⁿa∂xⁿ, a, device, n) =
     ClimaComms.@threaded device for y in axes(a, 2), x in axes(a, 1)
         @inbounds ∂ⁿa∂xⁿ[x, y] = nth_deriv_along_x_axis(a, n, x, y)
     end
-end
-threaded_deriv_2!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@cuda_sync device begin
-    ClimaComms.@threaded device begin
+threaded_deriv_2!(∂ⁿa∂xⁿ, a, device, n, debug) =
+    ClimaComms.@threaded device debug=debug begin
         ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
         for y in axes(a, 2)
             @inbounds view(∂ⁿa∂xⁿ, :, y) .= nth_deriv_along_x_axis(a, n).(X, y)
         end
     end
-end
-threaded_deriv_3!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@cuda_sync device begin
-    ClimaComms.@threaded device begin
-        ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
-        for y in axes(a, 2)
-            a_col = ClimaComms.shmem_array(X, eltype(a))
-            @inbounds a_col .= view(a, :, y)
-            @inbounds view(∂ⁿa∂xⁿ, :, y) .=
-                nth_deriv_along_x_axis(a_col, n).(X)
-        end
+threaded_deriv_2!(∂ⁿa∂xⁿ, a, device, n) =
+    threaded_deriv_2!(∂ⁿa∂xⁿ, a, device, n, nothing)
+threaded_deriv_3!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@threaded device begin
+    ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
+    for y in axes(a, 2)
+        a_col = ClimaComms.shmem_array(X, eltype(a))
+        @inbounds a_col .= view(a, :, y)
+        @inbounds view(∂ⁿa∂xⁿ, :, y) .= nth_deriv_along_x_axis(a_col, n).(X)
     end
 end
-threaded_deriv_4!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@cuda_sync device begin
-    ClimaComms.@threaded device begin
-        ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
-        for y in axes(a, 2)
-            a_col = ClimaComms.shmem_array(X, eltype(a))
-            @inbounds a_col .= view(a, :, y)
-            m = n ÷ 2
-            @inbounds ∂ᵐa∂xᵐ_col = nth_deriv_along_x_axis(a_col, m).(X)
-            @inbounds view(∂ⁿa∂xⁿ, :, y) .=
-                nth_deriv_along_x_axis(∂ᵐa∂xᵐ_col, n - m).(X)
-        end
+threaded_deriv_4!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@threaded device begin
+    ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
+    for y in axes(a, 2)
+        a_col = ClimaComms.shmem_array(X, eltype(a))
+        @inbounds a_col .= view(a, :, y)
+        m = n ÷ 2
+        @inbounds ∂ᵐa∂xᵐ_col = nth_deriv_along_x_axis(a_col, m).(X)
+        @inbounds view(∂ⁿa∂xⁿ, :, y) .=
+            nth_deriv_along_x_axis(∂ᵐa∂xᵐ_col, n - m).(X)
     end
 end
-threaded_deriv_5!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@cuda_sync device begin
-    ClimaComms.@threaded device begin
-        ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
-        for y in axes(a, 2)
-            if n == 0
-                @inbounds view(∂ⁿa∂xⁿ, :, y) .= view(a, :, y)
-                continue
-            end
-            two_cols = ClimaComms.shmem_array(X, eltype(a), (length(X), 2))
-            @inbounds view(two_cols, :, 1) .= view(a, :, y)
-            prev_col_index = 1
-            for m in 1:(n - 1)
-                new_col_index = 3 - prev_col_index
-                @inbounds view(two_cols, :, new_col_index) .=
-                    deriv_along_x_axis(two_cols).(X, prev_col_index)
-                prev_col_index = new_col_index
-            end
-            @inbounds view(∂ⁿa∂xⁿ, :, y) .=
+threaded_deriv_5!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@threaded device begin
+    ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
+    for y in axes(a, 2)
+        if n == 0
+            @inbounds view(∂ⁿa∂xⁿ, :, y) .= view(a, :, y)
+            continue
+        end
+        two_cols = ClimaComms.shmem_array(X, eltype(a), (length(X), 2))
+        @inbounds view(two_cols, :, 1) .= view(a, :, y)
+        prev_col_index = 1
+        for m in 1:(n - 1)
+            new_col_index = 3 - prev_col_index
+            @inbounds view(two_cols, :, new_col_index) .=
                 deriv_along_x_axis(two_cols).(X, prev_col_index)
+            prev_col_index = new_col_index
         end
+        @inbounds view(∂ⁿa∂xⁿ, :, y) .=
+            deriv_along_x_axis(two_cols).(X, prev_col_index)
     end
 end
 
@@ -193,6 +192,11 @@ println()
 ∂ⁿa∂xⁿ_ref = similar(a)
 ∂ⁿa∂xⁿ_threaded = similar(a)
 reads_and_writes_for_deriv = sizeof(a) + sizeof(∂ⁿa∂xⁿ_ref)
+for (debug_sym, debug_str) in ((:warn, "Julia"), (:llvm, "LLVM"), (:ptx, "PTX"))
+    println()
+    @info "$debug_str code for 0th derivative along 1st axis of matrix:"
+    threaded_deriv_2!(∂ⁿa∂xⁿ_threaded, a, device, 0, Val(debug_sym))
+end
 for n in (0, 2, 4, 6)
     time_0 =
         n > 0 ? 0 :
@@ -235,36 +239,32 @@ ref_deriv_max!(∂ⁿa∂xⁿ_max, ∂ⁿa∂xⁿ, a, device, n, cartesian_indic
         maximum!(reshape(∂ⁿa∂xⁿ_max, 1, :), ∂ⁿa∂xⁿ)
     end
 threaded_deriv_max_1!(∂ⁿa∂xⁿ_max, a, device, n) =
-    ClimaComms.@cuda_sync device begin
-        ClimaComms.@threaded device begin
-            ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
-            for y in axes(a, 2)
-                a_col = ClimaComms.shmem_array(X, eltype(a))
-                @inbounds a_col .= view(a, :, y)
-                @inbounds ∂ⁿa∂xⁿ_col = nth_deriv_along_x_axis(a_col, n).(X)
-                @inbounds ∂ⁿa∂xⁿ_col_max = view(∂ⁿa∂xⁿ_max, y)
-                ClimaComms.shmem_maximum!(∂ⁿa∂xⁿ_col_max, ∂ⁿa∂xⁿ_col)
-            end
+    ClimaComms.@threaded device begin
+        ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
+        for y in axes(a, 2)
+            a_col = ClimaComms.shmem_array(X, eltype(a))
+            @inbounds a_col .= view(a, :, y)
+            @inbounds ∂ⁿa∂xⁿ_col = nth_deriv_along_x_axis(a_col, n).(X)
+            @inbounds ∂ⁿa∂xⁿ_col_max = view(∂ⁿa∂xⁿ_max, y)
+            ClimaComms.shmem_maximum!(∂ⁿa∂xⁿ_col_max, ∂ⁿa∂xⁿ_col)
         end
     end
 threaded_deriv_max_2!(∂ⁿa∂xⁿ_max, a, device, n) =
-    ClimaComms.@cuda_sync device begin
-        ClimaComms.@threaded device begin
-            ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
-            for y in axes(a, 2)
-                two_cols = ClimaComms.shmem_array(X, eltype(a), (length(X), 2))
-                @inbounds view(two_cols, :, 1) .= view(a, :, y)
-                prev_col_index = 1
-                for m in 1:n
-                    new_col_index = 3 - prev_col_index
-                    @inbounds view(two_cols, :, new_col_index) .=
-                        deriv_along_x_axis(two_cols).(X, prev_col_index)
-                    prev_col_index = new_col_index
-                end
-                @inbounds ∂ⁿa∂xⁿ_col = view(two_cols, :, prev_col_index)
-                @inbounds ∂ⁿa∂xⁿ_col_max = view(∂ⁿa∂xⁿ_max, y)
-                ClimaComms.shmem_maximum!(∂ⁿa∂xⁿ_col_max, ∂ⁿa∂xⁿ_col)
+    ClimaComms.@threaded device begin
+        ClimaComms.@shmem_threaded X = StaticArrays.SOneTo(x_max)
+        for y in axes(a, 2)
+            two_cols = ClimaComms.shmem_array(X, eltype(a), (length(X), 2))
+            @inbounds view(two_cols, :, 1) .= view(a, :, y)
+            prev_col_index = 1
+            for m in 1:n
+                new_col_index = 3 - prev_col_index
+                @inbounds view(two_cols, :, new_col_index) .=
+                    deriv_along_x_axis(two_cols).(X, prev_col_index)
+                prev_col_index = new_col_index
             end
+            @inbounds ∂ⁿa∂xⁿ_col = view(two_cols, :, prev_col_index)
+            @inbounds ∂ⁿa∂xⁿ_col_max = view(∂ⁿa∂xⁿ_max, y)
+            ClimaComms.shmem_maximum!(∂ⁿa∂xⁿ_col_max, ∂ⁿa∂xⁿ_col)
         end
     end
 

@@ -4,8 +4,8 @@ ClimaComms.needs_metadata_to_unroll_shmem_loops(::CUDADevice) = true
 
 ClimaComms.sync_shmem_threads!(::CUDADevice) = sync_threads_in_block()
 
-ClimaComms.shmem_thread_indices(::CUDADevice, itr) =
-    thread_idx_in_block():threads_in_block():length(itr)
+ClimaComms.shmem_thread_indices(::CUDADevice, n_items) =
+    thread_idx_in_block():threads_in_block():n_items
 
 @generated function ClimaComms.unrolled_shmem_thread_indices(
     ::CUDADevice,
