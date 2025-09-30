@@ -34,7 +34,7 @@ steps:
   - label: ":computer: tests MPI"
     key: "cpu_tests_mpi"
     command:
-      - srun julia --project=test test/runtests.jl
+      - srun julia --color=yes --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
       CLIMACOMMS_CONTEXT: MPI
@@ -55,7 +55,7 @@ steps:
   - label: ":computer: threaded tests MPI"
     key: "cpu_threaded_tests_mpi"
     command:
-      - srun julia --threads 4 --project=test test/runtests.jl
+      - srun julia --color=yes --threads 4 --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CPU
       CLIMACOMMS_CONTEXT: MPI
@@ -77,7 +77,7 @@ steps:
   - label: ":flower_playing_cards: tests MPI"
     key: "gpu_tests_mpi"
     command:
-      - srun julia --project=test test/runtests.jl
+      - srun julia --color=yes --project=test test/runtests.jl
     env:
       CLIMACOMMS_TEST_DEVICE: CUDA
       CLIMACOMMS_CONTEXT: MPI
