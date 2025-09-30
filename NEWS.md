@@ -4,6 +4,10 @@ ClimaComms.jl Release Notes
 main
 -------
 
+v0.6.10
+-------
+- fixed logging interoperability with `GPUCompiler.jl` [PR 119](https://github.com/CliMA/ClimaComms.jl/pull/119)
+
 v0.6.9
 -------
 - Added a device-agnostic API for querying available memory [PR 117](https://github.com/CliMA/ClimaComms.jl/pull/117).
