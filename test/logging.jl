@@ -8,6 +8,7 @@ ctx = ClimaComms.context()
     ClimaComms.with_tempdir(ctx) do log_dir
         io = IOBuffer()
         logger = ClimaComms.FileLogger(io, ctx, log_dir)
+        @test Logging.min_enabled_level(logger) == Logging.Info
         fname = ClimaComms.iamroot(ctx) ? "output.log" : "logs/rank_$mypid.log"
         with_logger(logger) do
             test_str = "Test message from rank $mypid"
@@ -27,6 +28,7 @@ end
 @testset "MPILogger" begin
     io = IOBuffer()
     logger = ClimaComms.MPILogger(io, ctx)
+    @test Logging.min_enabled_level(logger) == Logging.Info
     with_logger(logger) do
         @info "smoke test"
     end
@@ -52,6 +54,7 @@ end
     logger = ClimaComms.OnlyRootLogger(ctx)
     @test typeof(ClimaComms.OnlyRootLogger()) == typeof(logger)
     if ClimaComms.iamroot(ctx)
+        @test Logging.min_enabled_level(logger) == Logging.Info
         @test logger isa Logging.ConsoleLogger
     else
         @test logger isa Logging.NullLogger

@@ -38,7 +38,9 @@ function MPILogger(iostream, ctx::AbstractCommsContext)
         println(io, " $(log.level): $(log.message)")
     end
 
-    return LoggingExtras.FormatLogger(format_log, iostream)
+    logger = LoggingExtras.FormatLogger(format_log, iostream)
+    # Wrap in a MinLevelLogger to ensure a minimum log level is discoverable (issue #118)
+    return LoggingExtras.MinLevelLogger(logger, Logging.Info)
 end
 
 """
@@ -92,14 +94,13 @@ function FileLogger(
     filtered_logger =
         LoggingExtras.EarlyFilteredLogger(min_level_filter, file_logger)
 
-    if iamroot(ctx) && log_stdout
-        return LoggingExtras.TeeLogger((
-            Logging.ConsoleLogger(io),
-            filtered_logger,
-        ))
+    logger = if iamroot(ctx) && log_stdout
+        LoggingExtras.TeeLogger((Logging.ConsoleLogger(io), filtered_logger))
     else
-        return filtered_logger
+        filtered_logger
     end
+    # Wrap in a MinLevelLogger to ensure a minimum log level is discoverable (issue #118)
+    return LoggingExtras.MinLevelLogger(logger, min_level)
 end
 
 function FileLogger(
@@ -126,14 +127,13 @@ function FileLogger(
     filtered_logger =
         LoggingExtras.EarlyFilteredLogger(min_level_filter, file_logger)
 
-    if log_stdout
-        return LoggingExtras.TeeLogger((
-            Logging.ConsoleLogger(io),
-            filtered_logger,
-        ))
+    logger = if log_stdout
+        LoggingExtras.TeeLogger((Logging.ConsoleLogger(io), filtered_logger))
     else
-        return filtered_logger
+        filtered_logger
     end
+    # Wrap in a MinLevelLogger to ensure a minimum log level is discoverable (issue #118)
+    return LoggingExtras.MinLevelLogger(logger, min_level)
 end
 
 """
