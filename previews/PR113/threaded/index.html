@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Threaded · ClimaComms.jl</title><meta name="title" content="Threaded · ClimaComms.jl"/><meta property="og:title" content="Threaded · ClimaComms.jl"/><meta property="twitter:title" content="Threaded · ClimaComms.jl"/><meta name="description" content="Documentation for ClimaComms.jl."/><meta property="og:description" content="Documentation for ClimaComms.jl."/><meta property="twitter:description" content="Documentation for ClimaComms.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">ClimaComms.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../internals/">Developing with <code>ClimaComms</code></a></li><li class="is-active"><a class="tocitem" href>Threaded</a></li><li><a class="tocitem" href="../logging/">Logging</a></li><li><a class="tocitem" href="../faqs/">Frequently Asked Questions</a></li><li><a class="tocitem" href="../apis/">APIs</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Threaded</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Threaded</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/CliMA/ClimaComms.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/CliMA/ClimaComms.jl/blob/main/docs/src/threaded.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Writing-@threaded-Kernels"><a class="docs-heading-anchor" href="#Writing-@threaded-Kernels">Writing <code>@threaded</code> Kernels</a><a id="Writing-@threaded-Kernels-1"></a><a class="docs-heading-anchor-permalink" href="#Writing-@threaded-Kernels" title="Permalink"></a></h1><p><strong>This documentation needs to be updated for the new API.</strong></p><p>In this section, we will give a tutorial for writing device-agnostic kernels using <code>ClimaComms.@threaded</code>. As an illustrative example, we will show how to approximate the <code>n</code>-th derivative of a matrix in an efficient GPU kernel.</p><p>We can compute the first derivative of an <code>array</code> along each column using second-order finite differences with periodic boundary conditions as</p><pre><code class="language-julia hljs">Base.@propagate_inbounds function axis1_deriv(array, index1, indices...)
+    prev_index1 = index1 == 1 ? size(array, 1) : index1 - 1
+    next_index1 = index1 == size(array, 1) ? 1 : index1 + 1
+    return (
+        array[next_index1, indices...] -
+        2 * array[index1, indices...] +
+        array[prev_index1, indices...]
+    ) / 2
+end</code></pre><p>This can be recursively extended to the <code>n</code>-th derivative as</p><pre><code class="language-julia hljs">Base.@propagate_inbounds function axis1_nth_deriv(n, array, index1, indices...)
+    prev_index1 = index1 == 1 ? size(array, 1) : index1 - 1
+    next_index1 = index1 == size(array, 1) ? 1 : index1 + 1
+    if n == 1
+        return (
+            array[next_index1, indices...] -
+            2 * array[index1, indices...] +
+            array[prev_index1, indices...]
+        ) / 2
+    else
+        return (
+            axis1_nth_deriv(n - 1, array, next_index1, indices...) -
+            2 * axis1_nth_deriv(n - 1, array, index1, indices...) +
+            axis1_nth_deriv(n - 1, array, prev_index1, indices...)
+        ) / 2
+    end
+end</code></pre><p>The simplest way to parallelize this function over the indices of a <code>matrix</code> is to directly evaluate the function at every point:</p><pre><code class="language-julia hljs">columnwise_nth_deriv!(result, matrix, n, device) =
+    ClimaComms.@threaded device for i in axes(matrix, 1), j in axes(matrix, 2)
+        @inbounds result[i, j] = axis1_nth_deriv(n, matrix, i, j)
+    end</code></pre><p>However, this implementation results in a very large number of global memory reads: <code>matrix</code> is accessed <code>O(3^n)</code> times, which becomes prohibitively large as <code>n</code> grows. For example, here is the performance for a <code>100 × 1000</code> matrix with <code>n = 1</code> and <code>n = 10</code>:</p><pre><code class="language-julia hljs"># TODO: Add performance benchmarks.</code></pre><p>To reduce the number of global memory reads, we can move each column of the <code>matrix</code> into shared memory before using it to evaluate the <code>n</code>-th derivative. This makes each row index <code>i in axes(matrix, 1)</code> interdependent with every other row index, which we need to explicitly declare:</p><pre><code class="language-julia hljs">columnwise_nth_deriv!(result, matrix, n, device, ::Val{N_rows}) where {N_rows} =
+    ClimaComms.@threaded device begin
+        for i in @interdependent(axes(matrix, 1)), j in axes(matrix, 2)
+            T = eltype(matrix)
+            matrix_col =
+                ClimaComms.static_shared_memory_array(device, T, N_rows)
+            @inbounds begin
+                ClimaComms.@sync_interdependent matrix_col[i] = matrix[i, j]
+                ClimaComms.@sync_interdependent result[i, j] =
+                    axis1_nth_deriv(n, matrix_col, i)
+            end
+        end
+    end</code></pre><p>The shared memory array used to store each column is statically-sized, so the number of rows in each column must be passed as a static parameter. Also, every use of the interdependent variable <code>i</code> must occur inside a <code>@sync_interdependent</code> expression.</p><p>In this implementation, there are <code>O(N_rows)</code> global memory reads and <code>O(N_rows * 3^n)</code> shared memory reads, which improves the performance:</p><pre><code class="language-julia hljs"># TODO: Add performance benchmarks.</code></pre><p>We can further improve runtime by splitting the <code>O(N_rows * 3^n)</code> shared memory reads into two sets of <code>O(N_rows * 3^(n ÷ 2))</code> shared memory reads:</p><pre><code class="language-julia hljs">columnwise_nth_deriv!(result, matrix, n, device, ::Val{N_rows}) where {N_rows} =
+    ClimaComms.@threaded device begin
+        for i in @interdependent(axes(matrix, 1)), j in axes(matrix, 2)
+            T = eltype(matrix)
+            matrix_col =
+                ClimaComms.static_shared_memory_array(device, T, N_rows)
+            intermediate_result_col =
+                ClimaComms.static_shared_memory_array(device, T, N_rows)
+            @inbounds begin
+                ClimaComms.@sync_interdependent matrix_col[i] = matrix[i, j]
+                ClimaComms.@sync_interdependent intermediate_result_col[i] =
+                    axis1_nth_deriv(n ÷ 2, matrix_col, i)
+                ClimaComms.@sync_interdependent result[i, j] =
+                    axis1_nth_deriv(n - n ÷ 2, intermediate_result_col, i)
+            end
+        end
+    end</code></pre><p>This implementaion has the following performance:</p><pre><code class="language-julia hljs"># TODO: Add performance benchmarks.</code></pre><p>We can continue to reduce the number of shared memory reads by adding more intermediate results, though for large values of <code>n</code> we will hit another performance barrier in thread synchronization time. The number of intermediate results that gives the best performance will depend on the value of <code>n</code> and the characteristics of the GPU.</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../internals/">« Developing with <code>ClimaComms</code></a><a class="docs-footer-nextpage" href="../logging/">Logging »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.4.0 on <span class="colophon-date" title="Wednesday 3 September 2025 11:09">Wednesday 3 September 2025</span>. Using Julia version 1.11.6.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
