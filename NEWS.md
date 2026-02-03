@@ -3,7 +3,12 @@ ClimaComms.jl Release Notes
 
 main
 -------
+
+v0.6.11
+-------
 - ci: update JuliaFormatter job [PR 127](https://github.com/CliMA/ClimaComms.jl/pull/127)
+- Added Metal support [PR 126](https://github.com/CliMA/ClimaComms.jl/pull/126)
+  - NOTE: This is considered experimental as it is not continuously tested in CI.
 
 v0.6.10
 -------

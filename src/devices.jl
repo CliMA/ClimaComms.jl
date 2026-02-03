@@ -38,6 +38,13 @@ Use NVIDIA GPU accelarator
 struct CUDADevice <: AbstractDevice end
 
 """
+    MetalDevice()
+
+Use Apple GPU accelerator (Metal)
+"""
+struct MetalDevice <: AbstractDevice end
+
+"""
     ClimaComms.device_functional(device)
 
 Return true when the `device` is correctly set up.
@@ -57,6 +64,8 @@ function device_type()
         return :CPUMultiThreaded
     elseif env_var == "CUDA"
         return :CUDADevice
+    elseif env_var == "Metal"
+        return :MetalDevice
     else
         error("Invalid CLIMACOMMS_DEVICE: $env_var")
     end
@@ -71,7 +80,8 @@ Allowed values:
 - `CPU`, single-threaded or multi-threaded depending on the number of threads;
 - `CPUSingleThreaded`,
 - `CPUMultiThreaded`,
-- `CUDA`.
+- `CUDA`,
+- `Metal`.
 
 The default is `CPU`.
 """
@@ -80,6 +90,11 @@ function device()
     if target_device == :CUDADevice && !cuda_ext_is_loaded()
         error(
             "Loading CUDA.jl is required to use CUDADevice. You might want to call ClimaComms.@import_required_backends",
+        )
+    end
+    if target_device == :MetalDevice && !metal_ext_is_loaded()
+        error(
+            "Loading Metal.jl is required to use MetalDevice. You might want to call ClimaComms.@import_required_backends",
         )
     end
     DeviceConstructor = getproperty(ClimaComms, target_device)
@@ -742,3 +757,51 @@ Base.@propagate_inbounds function Base.getindex(
 end
 
 # TODO: Check whether conversion of every Int to Int32 improves GPU performance.
+
+# Internal helpers for GPU kernel launch parameters
+
+"""
+    _compute_launch_params_simple(n_items, max_blocks, max_threads_in_block)
+
+Compute kernel launch parameters (`blocks`, `threads_in_block`) for a simple (1 item per thread)
+execution strategy. Returns `nothing` if the number of items exceeds the GPU's capacity for
+this strategy (requires coarsening).
+
+Used by `ClimaCommsCUDAExt` and `ClimaCommsMetalExt` in `run_threaded`.
+"""
+function _compute_launch_params_simple(
+    n_items, max_blocks, max_threads_in_block,
+)
+    if n_items <= max_blocks * max_threads_in_block
+        threads_in_block = min(max_threads_in_block, n_items)
+        blocks = cld(n_items, threads_in_block)
+        return (; blocks, threads_in_block)
+    else
+        return nothing
+    end
+end
+
+"""
+    _compute_launch_params_coarsened(n_items, max_blocks, max_threads_in_block, min_items_in_thread)
+
+Compute kernel launch parameters (`blocks`, `threads_in_block`) for a coarsened execution strategy,
+where each thread processes at least `min_items_in_thread`. This strategy maximizes GPU occupancy
+when `n_items` is large.
+
+Used by `ClimaCommsCUDAExt` and `ClimaCommsMetalExt` in `run_threaded`.
+"""
+function _compute_launch_params_coarsened(
+    n_items, max_blocks, max_threads_in_block, min_items_in_thread,
+)
+    # If there are too many items to use the specified coarsening, increase it
+    # by the smallest possible amount.
+    max_required_threads = cld(n_items, min_items_in_thread)
+    items_in_thread =
+        max_required_threads <= max_blocks * max_threads_in_block ?
+        min_items_in_thread :
+        cld(n_items, max_blocks * max_threads_in_block)
+
+    threads_in_block = min(max_threads_in_block, max_required_threads)
+    blocks = cld(n_items, items_in_thread * threads_in_block)
+    return (; blocks, threads_in_block)
+end

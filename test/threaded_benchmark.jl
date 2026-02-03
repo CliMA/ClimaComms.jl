@@ -9,7 +9,7 @@ AT = ClimaComms.array_type(device)
 
 x_max = 100
 y_max = device isa ClimaComms.CUDADevice ? 1000000 : 10000
-a = AT(rand(x_max, y_max))
+a = AT(rand(Float32, x_max, y_max))
 ∂ⁿa∂xⁿ = similar(a)
 
 Base.@propagate_inbounds function nth_deriv_along_axis1(array, n, i, indices...)
