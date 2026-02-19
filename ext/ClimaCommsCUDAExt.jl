@@ -88,7 +88,7 @@ function ClimaComms.run_threaded(
             @inbounds f(itr[firstindex(itr) + item_index - 1])
         return nothing
     end
-    kernel = CUDA.@cuda always_inline=true launch=false call_f_from_thread()
+    kernel = CUDA.@cuda always_inline = true launch = false call_f_from_thread()
     max_blocks = grid_size_limit(kernel)
     max_threads_in_block = block_size_limit(block_size, kernel)
 
@@ -118,7 +118,7 @@ function ClimaComms.run_threaded(
         for item_index in thread_index():threads_in_kernel():n_items
             @inbounds f(itr[firstindex(itr) + item_index - 1])
         end
-    kernel = CUDA.@cuda always_inline=true launch=false call_f_from_thread()
+    kernel = CUDA.@cuda always_inline = true launch = false call_f_from_thread()
     max_blocks = grid_size_limit(kernel)
     max_threads_in_block = block_size_limit(block_size, kernel)
 

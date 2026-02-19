@@ -3,6 +3,7 @@ ClimaComms.jl Release Notes
 
 main
 -------
+- ci: update JuliaFormatter job [PR 127](https://github.com/CliMA/ClimaComms.jl/pull/127)
 
 v0.6.10
 -------

@@ -238,25 +238,26 @@ end
     kernel1!(a, b)
     @test a == b
 
-    kernel2!(a, b) = ClimaComms.@threaded coarsen=:static for i in axes(a, 1)
+    kernel2!(a, b) = ClimaComms.@threaded coarsen = :static for i in axes(a, 1)
         a[i] = 2 * b[i]
     end
     kernel2!(a, b)
     @test a == 2 * b
 
-    kernel3!(a, b) = ClimaComms.@threaded device coarsen=3 for i in axes(a, 1)
+    kernel3!(a, b) = ClimaComms.@threaded device coarsen = 3 for i in axes(a, 1)
         a[i] = 3 * b[i]
     end
     kernel3!(a, b)
     @test a == 3 * b
 
-    kernel4!(a, b) = ClimaComms.@threaded device coarsen=400 for i in axes(a, 1)
+    kernel4!(a, b) = ClimaComms.@threaded device coarsen = 400 for i in
+                                                                   axes(a, 1)
         a[i] = 4 * b[i]
     end
     kernel4!(a, b)
     @test a == 4 * b
 
-    kernel5!(a, b) = ClimaComms.@threaded block_size=50 for i in axes(a, 1)
+    kernel5!(a, b) = ClimaComms.@threaded block_size = 50 for i in axes(a, 1)
         a[i] = 5 * b[i]
     end
     kernel5!(a, b)
