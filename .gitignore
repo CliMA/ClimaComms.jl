@@ -25,3 +25,6 @@ docs/site/
 # environment.
 Manifest.toml
 !docs/Manifest.toml
+
+# VSCode
+.DS_Store
