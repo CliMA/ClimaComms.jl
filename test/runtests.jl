@@ -238,7 +238,7 @@ end
     kernel1!(a, b)
     @test a == b
 
-    kernel2!(a, b) = ClimaComms.@threaded coarsen=:static for i in axes(a, 1)
+    kernel2!(a, b) = ClimaComms.@threaded coarsen=1 for i in axes(a, 1)
         a[i] = 2 * b[i]
     end
     kernel2!(a, b)

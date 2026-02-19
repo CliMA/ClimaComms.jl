@@ -15,6 +15,7 @@ makedocs(
     pages = Any[
         "Home" => "index.md",
         "Developing with `ClimaComms`" => "internals.md",
+        "Threaded" => "threaded.md",
         "Logging" => "logging.md",
         "Frequently Asked Questions" => "faqs.md",
         "APIs" => "apis.md",
