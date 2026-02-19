@@ -22,7 +22,7 @@ jobs:
         access_token: ${{ github.token }}
 
     - name: Checkout
-      uses: actions/checkout@v2.2.0
+      uses: actions/checkout@v6
 
     # Setup a filter and only run if src/ test/ folder content changes
     # or project depedencies
