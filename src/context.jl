@@ -1,23 +1,13 @@
 import ..ClimaComms
 
 function context_type()
-    name = get(ENV, "CLIMACOMMS_CONTEXT", nothing)
-    if !isnothing(name)
-        if name == "MPI"
-            return :MPICommsContext
-        elseif name == "SINGLETON"
-            return :SingletonCommsContext
-        else
-            error("Invalid context: $name")
-        end
-    end
-    # detect common environment variables used by MPI launchers
-    #   PMI_RANK appears to be used by MPICH and srun
-    #   OMPI_COMM_WORLD_RANK appears to be used by OpenMPI
-    if haskey(ENV, "PMI_RANK") || haskey(ENV, "OMPI_COMM_WORLD_RANK")
+    name = get(ENV, "CLIMACOMMS_CONTEXT", "SINGLETON")
+    if name == "MPI"
         return :MPICommsContext
-    else
+    elseif name == "SINGLETON"
         return :SingletonCommsContext
+    else
+        error("Invalid context: $name")
     end
 end
 
