@@ -17,7 +17,7 @@ ClimaCommsCUDAExt = "CUDA"
 ClimaCommsMPIExt = "MPI"
 
 [compat]
-CUDA = "3, 4, 5, 6.0"
+CUDA = "3, 4, 5, 6"
 Adapt = "3, 4"
 Logging = "1.9.4"
 LoggingExtras = "1.1.0"
