@@ -18,21 +18,15 @@ function Base.summary(io::IO, ::CUDADevice)
     return "$name ($uuid)"
 end
 
-function ClimaComms.device_functional(::CUDADevice)
-    return CUDA.functional()
-end
-
-function Adapt.adapt_structure(
-    to::Type{<:CUDA.CuArray},
-    ctx::ClimaComms.AbstractCommsContext,
-)
-    return ClimaComms.context(Adapt.adapt(to, ClimaComms.device(ctx)))
-end
+ClimaComms.device_functional(::CUDADevice) = CUDA.functional()
 
 Adapt.adapt_structure(
-    ::Type{<:CUDA.CuArray},
-    device::ClimaComms.AbstractDevice,
-) = ClimaComms.CUDADevice()
+    to::Type{<:CUDA.CuArray}, ctx::ClimaComms.AbstractCommsContext,
+) =
+    ClimaComms.context(Adapt.adapt(to, ClimaComms.device(ctx)))
+
+Adapt.adapt_structure(::Type{<:CUDA.CuArray}, ::ClimaComms.AbstractDevice) =
+    ClimaComms.CUDADevice()
 
 ClimaComms.array_type(::CUDADevice) = CUDA.CuArray
 ClimaComms.free_memory(::CUDADevice) = CUDA.free_memory()
@@ -61,8 +55,7 @@ thread_index() =
 
 # The maximum number of blocks that can fit on the GPU used for this kernel.
 grid_size_limit(kernel) = CUDA.attribute(
-    CUDA.device(kernel.fun.mod.ctx),
-    CUDA.DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
+    CUDA.device(kernel.fun.mod.ctx), CUDA.DEVICE_ATTRIBUTE_MAX_GRID_DIM_X,
 )
 
 # Either the first value if it is available, or the maximum number of threads
@@ -73,11 +66,7 @@ block_size_limit(::Val{:auto}, kernel) =
     CUDA.launch_configuration(kernel.fun).threads
 
 function ClimaComms.run_threaded(
-    f::F,
-    ::CUDADevice,
-    ::Val,
-    itr;
-    block_size,
+    f::F, ::CUDADevice, ::Val, itr; block_size,
 ) where {F}
     n_items = length(itr)
     n_items > 0 || return nothing
@@ -92,21 +81,18 @@ function ClimaComms.run_threaded(
     max_blocks = grid_size_limit(kernel)
     max_threads_in_block = block_size_limit(block_size, kernel)
 
+    params = ClimaComms._compute_launch_params_simple(
+        n_items, max_blocks, max_threads_in_block,
+    )
     # If there are too many items, coarsen by the smallest possible amount.
-    n_items <= max_blocks * max_threads_in_block ||
+    isnothing(params) &&
         return ClimaComms.run_threaded(f, CUDADevice(), 1, itr; block_size)
 
-    threads_in_block = min(max_threads_in_block, n_items)
-    blocks = cld(n_items, threads_in_block)
-    kernel(; blocks, threads = threads_in_block)
+    kernel(; params.blocks, threads = params.threads_in_block)
 end
 
 function ClimaComms.run_threaded(
-    f::F,
-    ::CUDADevice,
-    min_items_in_thread::Int,
-    itr;
-    block_size,
+    f::F, ::CUDADevice, min_items_in_thread::Int, itr; block_size,
 ) where {F}
     min_items_in_thread > 0 || throw(ArgumentError("`coarsen` is not positive"))
     n_items = length(itr)
@@ -122,16 +108,10 @@ function ClimaComms.run_threaded(
     max_blocks = grid_size_limit(kernel)
     max_threads_in_block = block_size_limit(block_size, kernel)
 
-    # If there are too many items to use the specified coarsening, increase it
-    # by the smallest possible amount.
-    max_required_threads = cld(n_items, min_items_in_thread)
-    items_in_thread =
-        max_required_threads <= max_blocks * max_threads_in_block ?
-        min_items_in_thread : cld(n_items, max_blocks * max_threads_in_block)
-
-    threads_in_block = min(max_threads_in_block, max_required_threads)
-    blocks = cld(n_items, items_in_thread * threads_in_block)
-    kernel(; blocks, threads = threads_in_block)
+    params = ClimaComms._compute_launch_params_coarsened(
+        n_items, max_blocks, max_threads_in_block, min_items_in_thread,
+    )
+    kernel(; params.blocks, threads = params.threads_in_block)
 end
 
 end

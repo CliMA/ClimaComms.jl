@@ -20,6 +20,8 @@ if haskey(ENV, "CLIMACOMMS_TEST_DEVICE")
         @test device isa ClimaComms.CPUMultiThreaded
     elseif ENV["CLIMACOMMS_TEST_DEVICE"] == "CUDA"
         @test device isa ClimaComms.CUDADevice
+    elseif ENV["CLIMACOMMS_TEST_DEVICE"] == "Metal"
+        @test device isa ClimaComms.MetalDevice
     end
 end
 
@@ -35,6 +37,7 @@ else
 end
 @testset "tree test $graph_opt" for graph_opt in graph_opt_list
     for FT in (Float32, Float64)
+        device isa ClimaComms.MetalDevice && FT == Float64 && continue  # Metal doesn't support Float64
         # every process communicates with the root
         if ClimaComms.iamroot(context)
             # send 2*n items to the nth pid, receive 3*n
@@ -101,6 +104,7 @@ end
 
 @testset "linear test $graph_opt" for graph_opt in graph_opt_list
     for FT in (Float32, Float64)
+        device isa ClimaComms.MetalDevice && FT == Float64 && continue  # Metal doesn't support Float64
         # send 2 values up
         if pid < nprocs
             sendpids = Int[pid + 1]
@@ -160,6 +164,7 @@ end
 
 @testset "gather" begin
     for FT in (Float32, Float64)
+        device isa ClimaComms.MetalDevice && FT == Float64 && continue  # Metal doesn't support Float64
         local_array = AT(fill(FT(pid), (3, pid)))
         gathered = ClimaComms.gather(context, local_array)
         if ClimaComms.iamroot(context)
@@ -174,6 +179,7 @@ end
 
 @testset "reduce/reduce!/allreduce" begin
     for FT in (Float32, Float64)
+        device isa ClimaComms.MetalDevice && FT == Float64 && continue  # Metal doesn't support Float64
         pidsum = div(nprocs * (nprocs + 1), 2)
 
         sendrecvbuf = AT(fill(FT(pid), 3))
@@ -214,12 +220,14 @@ end
     @test ClimaComms.bcast(context, "root pid is $pid") == "root pid is 1"
     @test ClimaComms.bcast(context, AT(fill(Float32(pid), 3))) ==
           AT(fill(Float32(1), 3))
-    @test ClimaComms.bcast(context, AT(fill(Float64(pid), 3))) ==
-          AT(fill(Float64(1), 3))
+    if !(device isa ClimaComms.MetalDevice)
+        @test ClimaComms.bcast(context, AT(fill(Float64(pid), 3))) ==
+              AT(fill(Float64(1), 3))
+    end
 end
 
 @testset "allowscalar" begin
-    a = AT(rand(3))
+    a = AT(rand(Float32, 3))
     local x
     ClimaComms.allowscalar(device) do
         x = a[1]
@@ -229,8 +237,8 @@ end
 end
 
 @testset "threaded" begin
-    a = AT(rand(100))
-    b = AT(rand(100))
+    a = AT(rand(Float32, 100))
+    b = AT(rand(Float32, 100))
 
     kernel1!(a, b) = ClimaComms.@threaded for i in axes(a, 1)
         a[i] = b[i]
@@ -265,8 +273,8 @@ end
 end
 
 @testset "threaded with lazy iterators" begin
-    a = AT(rand(100))
-    b = AT(rand(100))
+    a = AT(rand(Float32, 100))
+    b = AT(rand(Float32, 100))
 
     kernel1!(a, b) = ClimaComms.@threaded device for (i, b_i) in enumerate(b)
         a[i] = b_i
@@ -331,9 +339,9 @@ end
 end
 
 @testset "threaded with multiple iterators" begin
-    a = AT(rand(100, 1000))
-    b1 = AT(rand(100))
-    b2 = AT(rand(1000))
+    a = AT(rand(Float32, 100, 1000))
+    b1 = AT(rand(Float32, 100))
+    b2 = AT(rand(Float32, 1000))
 
     kernel1!(a, b1, b2) = ClimaComms.@threaded device begin
         for i in axes(a, 1), j in axes(a, 2)
