@@ -6,6 +6,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   test-os:
     timeout-minutes: 60
@@ -16,11 +20,6 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-    - name: Cancel Previous Runs
-      uses: styfle/cancel-workflow-action@0.4.0
-      with:
-        access_token: ${{ github.token }}
-
     - name: Checkout
       uses: actions/checkout@v6
 
