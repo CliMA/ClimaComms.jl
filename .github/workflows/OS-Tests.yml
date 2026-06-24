@@ -21,7 +21,7 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
 
     # Setup a filter and only run if src/ test/ folder content changes
     # or project depedencies
