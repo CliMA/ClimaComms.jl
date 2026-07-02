@@ -17,8 +17,6 @@ makedocs(
     modules = [ClimaComms],
     pages = Any["Home" => "index.md", "API" => "api.md"],
 )
-
-#=
 deploydocs(
     repo = "github.com/CliMA/ClimaComms.jl.git",
     target = "build",
@@ -26,4 +24,3 @@ deploydocs(
     devbranch = "main",
     forcepush = true,
 )
-=#
