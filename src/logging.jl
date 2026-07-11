@@ -1,14 +1,17 @@
 import Logging, LoggingExtras
 
-export MPILogger, MPIFileLogger
+export MPILogger, FileLogger
 
 """
     OnlyRootLogger()
     OnlyRootLogger(ctx::AbstractCommsContext)
 
-Return a logger that silences non-root processes.
-    
+Return a logger that prints to the console on the root process and
+silences all other processes.
+
 If no context is passed, obtain the default context via [`context`](@ref).
+For MPI runs, this logger is installed as the global logger by the first
+call to [`init`](@ref).
 """
 OnlyRootLogger() = OnlyRootLogger(context())
 
@@ -21,12 +24,19 @@ function OnlyRootLogger(ctx::AbstractCommsContext)
 end
 
 """
-    MPILogger(context::AbstractCommsContext)
-    MPILogger(iostream, context)
-    
-Add a rank prefix before log messages.
+    MPILogger(ctx::AbstractCommsContext)
+    MPILogger(iostream, ctx::AbstractCommsContext)
 
-Outputs to `stdout` if no IOStream is given.
+Return a logger that prefixes each log message with the process ID (e.g.,
+`[P1]`). Output goes to `stdout` if no `iostream` is given.
+
+# Examples
+```julia
+using Logging
+logger = ClimaComms.MPILogger(ClimaComms.context())
+global_logger(logger)
+@info "Hello"   # prints "[P1]  Info: Hello" on the root process
+```
 """
 MPILogger(ctx::AbstractCommsContext) = MPILogger(stdout, ctx)
 
@@ -44,12 +54,26 @@ function MPILogger(iostream, ctx::AbstractCommsContext)
 end
 
 """
-    FileLogger(context, log_dir; log_stdout = true, min_level = Logging.Info)
+    FileLogger(ctx, log_dir; log_stdout = true, min_level = Logging.Info)
 
-Log MPI ranks to different files within the `log_dir`.
+Return a logger that writes each process's log messages to a separate
+file in `log_dir` (`rank_1.log`, `rank_2.log`, ...), with
+`log_dir/output.log` a symbolic link to the root process's file. For
+single-process runs, all messages go directly to `log_dir/output.log`.
 
-The minimum logging level is set using `min_level`.
-If `log_stdout = true`, root process logs will be sent to stdout as well.
+# Keyword Arguments
+- `log_stdout = true`: if `true`, the root process also logs to `stdout`.
+- `min_level = Logging.Info`: the minimum level a message must have to be
+  logged.
+
+# Examples
+```julia
+using Logging
+logger = ClimaComms.FileLogger(ClimaComms.context(), "logs")
+with_logger(logger) do
+    @info "Written to logs/output.log and stdout"
+end
+```
 """
 function FileLogger(
     ctx::AbstractCommsContext,
@@ -73,14 +97,16 @@ function FileLogger(
     rank = mypid(ctx)
     filepath = abspath(joinpath(mpi_log_dir, "rank_$rank.log"))
 
-    state = Dict(:logger_used => false)
+    # Link output.log to the root process's log file, replacing a stale
+    # link left behind by a previous run in the same directory. If a
+    # regular file with that name exists, leave it untouched.
+    if iamroot(ctx)
+        symlink_path = abspath(joinpath(log_dir, "output.log"))
+        islink(symlink_path) && rm(symlink_path)
+        ispath(symlink_path) || symlink(filepath, symlink_path)
+    end
 
     function min_level_filter(log_args)
-        if iamroot(ctx) && !state[:logger_used]
-            state[:logger_used] = true
-            symlink_path = abspath(joinpath(log_dir, "output.log"))
-            symlink(filepath, symlink_path)
-        end
         return log_args.level >= min_level
     end
 
@@ -139,9 +165,10 @@ end
 """
     format_log(io, args)
 
-Format log messages similarly to `Logging.ConsoleLogger` for the FileLogger
+Format log messages similarly to `Logging.ConsoleLogger`, with box
+decorations for multiline messages, indentation, and bolding.
 
-Add box decorations for multiline strings, indentation, and bolding.
+Called from [`FileLogger`](@ref).
 """
 function format_log(io::IO, args)
     msg = string(args.message)
@@ -170,9 +197,11 @@ function format_log(io::IO, args)
 end
 
 """
-    with_tempdir(f::Function)
+    with_tempdir(f::Function, ctx::AbstractCommsContext)
 
-Call `f` on a temporary directory.
+Create a temporary directory on the root process, broadcast its path to
+all processes, and call `f` on the path. All processes receive the same
+path, so the directory can be used for files shared across the run.
 """
 function with_tempdir(f::Function, ctx)
     temp_dir = ClimaComms.iamroot(ctx) ? mktempdir() : nothing

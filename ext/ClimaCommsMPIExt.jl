@@ -101,9 +101,10 @@ ClimaComms.abort(ctx::ClimaComms.MPICommsContext, status::Int) =
     MPI.Abort(ctx.mpicomm, status)
 
 
-# We could probably do something fancier here?
-# Would need to be careful as there is no guarantee that all ranks will call
-# finalizers at the same time.
+# Give each graph context a distinct tag, so that concurrent exchanges do
+# not intercept each other's messages. Tags cannot be reclaimed when graph
+# contexts are garbage-collected, because there is no guarantee that all
+# ranks run finalizers at the same time.
 const TAG = Ref(Cint(0))
 function newtag(ctx::ClimaComms.MPICommsContext)
     TAG[] = tag = mod(TAG[] + 1, 32767) # TODO: this should query MPI_TAG_UB attribute (https://github.com/JuliaParallel/MPI.jl/pull/551)
@@ -116,7 +117,8 @@ end
 """
     MPISendRecvGraphContext
 
-A simple ghost buffer implementation using MPI `Isend`/`Irecv` operations.
+A graph context for exchanging ghost (halo) data using MPI `Isend` /
+`Irecv!` operations, which are posted anew by each [`ClimaComms.start`](@ref).
 """
 mutable struct MPISendRecvGraphContext <: ClimaComms.AbstractGraphContext
     ctx::ClimaComms.MPICommsContext
@@ -132,7 +134,10 @@ end
 """
     MPIPersistentSendRecvGraphContext
 
-A simple ghost buffer implementation using MPI persistent send/receive operations.
+A graph context for exchanging ghost (halo) data using persistent MPI
+send/receive requests, which are set up once and restarted by each
+[`ClimaComms.start`](@ref); this reduces the overhead of repeated
+exchanges.
 """
 struct MPIPersistentSendRecvGraphContext <: ClimaComms.AbstractGraphContext
     ctx::ClimaComms.MPICommsContext
@@ -317,7 +322,7 @@ function Base.summary(io::IO, ctx::ClimaComms.MPICommsContext)
         ClimaComms.local_communicator(ctx) do local_comm
             local_rank = MPI.Comm_rank(local_comm)
             local_size = MPI.Comm_size(local_comm)
-            dev_summary = summary(io, ClimaComms.device(ctx))
+            dev_summary = sprint(summary, ClimaComms.device(ctx))
             println(
                 io,
                 "Rank: $rank, Local Rank: $local_rank, Node: $node_name, Device: $dev_summary",

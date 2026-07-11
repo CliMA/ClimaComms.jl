@@ -4,6 +4,17 @@ ClimaComms.jl Release Notes
 main
 -------
 - ci: update JuliaFormatter job [PR 127](https://github.com/CliMA/ClimaComms.jl/pull/127)
+- ci: GitHub Actions now tests Julia 1.10 (LTS) in addition to 1.11.
+- The minimum supported Julia version was raised from 1.9 to 1.10 (the LTS); 1.9 was declared but never tested in CI.
+- Documentation overhaul: new README and logo, restructured docs (getting started, how-to guide, design philosophy), and revised docstrings throughout.
+- `FileLogger` is now exported, replacing the stale export of the removed `MPIFileLogger`.
+- `Base.summary(io, device)` now reports the type of the given device, rather than the device implied by environment variables.
+- Bug fixes from a code audit:
+  - Added the missing `abort` method for `SingletonCommsContext`; it previously threw a `MethodError`.
+  - `Base.summary(io, x)` methods for devices now print to `io` (the `Base` contract) instead of returning a string, so `summary(device)` no longer returns an empty string.
+  - `FileLogger` no longer crashes with an `IOError` when an MPI run reuses a `log_dir` from a previous run; the `output.log` symlink is now created up front and refreshed if stale.
+  - An invalid `coarsen` option for `@threaded`/`threaded` (e.g., `:greedy` on Julia < 1.11, or a typo) now throws an `ArgumentError` instead of a `StackOverflowError`.
+  - `reduce`, `allreduce`, and `gather` on `SingletonCommsContext` now return a copy of the input array instead of the input itself, matching the allocation behavior of the MPI methods.
 
 v0.6.10
 -------

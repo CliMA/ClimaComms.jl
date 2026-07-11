@@ -15,7 +15,7 @@ function Base.summary(io::IO, ::CUDADevice)
     dev = CUDA.device()
     name = CUDA.name(dev)
     uuid = CUDA.uuid(dev)
-    return "$name ($uuid)"
+    print(io, "$name ($uuid)")
 end
 
 function ClimaComms.device_functional(::CUDADevice)
@@ -40,7 +40,9 @@ ClimaComms.total_memory(::CUDADevice) = CUDA.total_memory()
 ClimaComms.allowscalar(f, ::CUDADevice, args...; kwargs...) =
     CUDA.@allowscalar f(args...; kwargs...)
 
-# Extending ClimaComms methods that operate on expressions (cannot use dispatch here)
+# CUDA methods of the functional forms underlying the device-flexible
+# macros (@sync, @time, etc.); macros cannot dispatch on the device type,
+# so they call these functions.
 ClimaComms.sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@sync f(args...; kwargs...)
 ClimaComms.cuda_sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =

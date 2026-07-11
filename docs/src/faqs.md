@@ -15,8 +15,10 @@ in your shell (outside of Julia, no spaces).
 
 ## My simulation does not start and crashes with a `MPI` error. I don't want to run with `MPI`. What should I do?
 
-`ClimaComms` tries to be smart and select the best configuration for your run.
-Sometimes, it fails with an error message like the following.
+If the `CLIMACOMMS_CONTEXT` environment variable is set to `MPI` (e.g., in a
+cluster job script or an inherited shell environment), `ClimaComms`
+constructs an MPI context, and MPI initialization can fail with an error
+message like the following.
 ```
 cmd=init pmi_version=2 pmi_subversion=0
 --------------------------------------------------------------------------
@@ -44,7 +46,7 @@ Please configure as appropriate and try again.
 ***    and potentially your MPI job)
 ```
 
-In this case, you can force `ClimaComms` to ignore `MPI`
+In this case, you can force `ClimaComms` to use a single-process context
 with
 ```julia
 ENV["CLIMACOMMS_CONTEXT"] = "SINGLETON"
@@ -65,7 +67,7 @@ but do not import `CUDA.jl` in your code.
 `ClimaComms` provides a macro, [`ClimaComms.@import_required_backends`](@ref),
 that you can add at the top of your scripts to automatically load the required
 packages when needed. Note, the packages have to be in your Julia environment,
-so you might install packages like ` MPI.jl` and `CUDA.jl`.
+so you might need to install packages like `MPI.jl` and `CUDA.jl`.
 
 ## How can I see the MPI state and verify that MPI is set up correctly?
 

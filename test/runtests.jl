@@ -218,6 +218,30 @@ end
           AT(fill(Float64(1), 3))
 end
 
+@testset "context interface" begin
+    # Every context operation must have a method for every context type,
+    # including operations that are rarely exercised (issue: `abort` was
+    # missing for SingletonCommsContext).
+    @test hasmethod(
+        ClimaComms.abort,
+        Tuple{ClimaComms.SingletonCommsContext, Int},
+    )
+end
+
+@testset "singleton results do not alias inputs" begin
+    # The MPI methods return newly allocated arrays, so the singleton
+    # methods must not return the input buffer itself.
+    sctx = ClimaComms.SingletonCommsContext(device)
+    buf = AT([1.0, 2.0, 3.0])
+    @test ClimaComms.allreduce(sctx, buf, +) == buf
+    @test ClimaComms.allreduce(sctx, buf, +) !== buf
+    @test ClimaComms.reduce(sctx, buf, +) == buf
+    @test ClimaComms.reduce(sctx, buf, +) !== buf
+    @test ClimaComms.gather(sctx, buf) == buf
+    @test ClimaComms.gather(sctx, buf) !== buf
+    @test ClimaComms.reduce(sctx, 1.0, +) === 1.0
+end
+
 @testset "allowscalar" begin
     a = AT(rand(3))
     local x
@@ -262,6 +286,21 @@ end
     end
     kernel5!(a, b)
     @test a == 5 * b
+
+    # An unknown scheduler must throw an ArgumentError, not overflow the
+    # stack (e.g., `coarsen = :greedy` on Julia < 1.11, or a typo).
+    @test_throws ArgumentError ClimaComms.threaded(
+        identity,
+        ClimaComms.CPUMultiThreaded(),
+        1:3;
+        coarsen = Val(:bogus),
+    )
+    @test_throws ArgumentError ClimaComms.threaded(
+        identity,
+        ClimaComms.CPUMultiThreaded(),
+        1:3;
+        coarsen = 1.5,
+    )
 end
 
 @testset "threaded with lazy iterators" begin

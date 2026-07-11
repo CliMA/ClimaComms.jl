@@ -25,6 +25,22 @@ ctx = ClimaComms.context()
     end
 end
 
+@testset "FileLogger re-run in the same directory" begin
+    ClimaComms.with_tempdir(ctx) do log_dir
+        for run in 1:2
+            io = IOBuffer()
+            logger = ClimaComms.FileLogger(io, ctx, log_dir)
+            with_logger(logger) do
+                @info "message from run $run"
+            end
+        end
+        fname = ClimaComms.iamroot(ctx) ? "output.log" : "logs/rank_$mypid.log"
+        log_content = read(joinpath(log_dir, fname), String)
+        @test occursin("message from run 1", log_content)
+        @test occursin("message from run 2", log_content)
+    end
+end
+
 @testset "MPILogger" begin
     io = IOBuffer()
     logger = ClimaComms.MPILogger(io, ctx)
@@ -67,6 +83,12 @@ summary_str = String(take!(io))
 print(summary_str)
 
 @testset "ClimaComms Summary Tests" begin
+    # summary(io, x) must print to io (Base contract), so that the
+    # no-io form returns the printed text.
+    @test summary(ClimaComms.CPUSingleThreaded()) == "CPUSingleThreaded"
+    @test sprint(summary, ClimaComms.CPUSingleThreaded()) ==
+          "CPUSingleThreaded"
+
     if ClimaComms.iamroot(ctx)
         @test contains(summary_str, string(nameof(typeof(ctx))))
         @test contains(

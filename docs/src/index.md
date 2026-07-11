@@ -1,93 +1,53 @@
-# ClimaComms
+# ClimaComms.jl
 
-`ClimaComms.jl` is a small package that provides abstractions for different
-computing devices and environments. `ClimaComms.jl` is use extensively by
-`CliMA` packages to control where and how simulations are run (e.g., one on
-core, on multiple GPUs, et cetera).
+`ClimaComms.jl` provides the abstractions for computing devices and
+communication contexts on which the [CliMA](https://github.com/CliMA)
+ecosystem is built. It lets the same simulation code run unchanged on a
+single CPU thread, on multiple CPU threads, on NVIDIA GPUs, and across many
+nodes with MPI: the device and the parallelism are selected at runtime,
+typically through environment variables.
 
-This page highlights the most important user-facing `ClimaComms` concepts. If
-you are using `ClimaComms` as a developer, refer to the [Developing with
-`ClimaComms`](@ref) page. For a detailed list of all the functions and objects
-implemented, the [APIs](@ref) page collects all of them.
+## The two central abstractions
 
-## `Device`s and `Context`s
+A **device** ([`ClimaComms.AbstractDevice`](@ref)) identifies the hardware
+that executes code. The devices currently implemented are
 
-The two most important objects in `ClimaComms.jl` are the [`Device`](@ref
-ClimaComms.AbstractDevice) and the [`Context`](@ref ClimaComms.AbstractCommsContext).
+- [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded): a CPU using a single thread,
+- [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded): a CPU using multiple threads,
+- [`CUDADevice`](@ref ClimaComms.CUDADevice): a single CUDA-enabled GPU.
 
-A `Device` identifies a computing device, a piece of hardware that will be
-executing some code. The `Device`s currently implemented are
-- [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded) for a CPU core with a single thread,
-- [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded) for a CPU core with multiple threads,
-- [`CUDADevice`](@ref ClimaComms.CUDADevice) for a single CUDA-enabled GPU.
+A **context** ([`ClimaComms.AbstractCommsContext`](@ref)) is the environment
+through which processes communicate. It wraps a device and, for distributed
+runs, the information needed to exchange data between processes. The
+contexts currently implemented are
 
-`Device`s are part of [`Context`](@ref ClimaComms.AbstractCommsContext)s,
-objects that contain information require for multiple `Device`s to communicate.
-Implemented `Context`s are
-- [`SingletonCommsContext`](@ref ClimaComms.SingletonCommsContext), when there is no parallelism;
-- [`MPICommsContext`](@ref ClimaComms.MPICommsContext) , for a MPI-parallelized runs.
+- [`SingletonCommsContext`](@ref ClimaComms.SingletonCommsContext): a single process, no parallelism;
+- [`MPICommsContext`](@ref ClimaComms.MPICommsContext): distributed runs via MPI.
 
-To choose a device and a context, most `CliMA` packages use the
-[`device()`](@ref ClimaComms.device()) and [`context()`](@ref ClimaComms.context()) functions. These functions look at
-specific environment variables and set the `device` and `context` accordingly.
-By default, the [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded) device is chosen and the context is
-set to [`SingletonCommsContext`](@ref ClimaComms.SingletonCommsContext) unless `ClimaComms` detects being run in
-a standard MPI launcher (as `srun` or `mpiexec`).
+Devices and contexts are selected at runtime with the
+[`ClimaComms.device`](@ref) and [`ClimaComms.context`](@ref) functions, which
+read the `CLIMACOMMS_DEVICE` and `CLIMACOMMS_CONTEXT` environment variables.
+For example, to run a script on a GPU with four MPI processes:
 
-For example, to run a simulation on a GPU, run `julia` as
 ```bash
 export CLIMACOMMS_DEVICE="CUDA"
-export CLIMACOMMS_CONTEXT="SINGLETON"
-# call/open julia as usual
+export CLIMACOMMS_CONTEXT="MPI"
+mpiexec -n 4 julia --project script.jl
 ```
 
 !!! note
-    There might be other ways to control the device and context. Please,
-    refer to the documentation of the specific package to learn more.
+    Some packages provide additional ways to control the device and context
+    (e.g., configuration files). Refer to the documentation of the specific
+    package to learn more.
 
-## Running with MPI/CUDA
+## Where to go next
 
-`CliMA` packages do not depend directly on `MPI` or `CUDA`, so, if you want to
-run your simulation in parallel mode and/or on GPUs, you will need to install
-some packages separately.
-
-For parallel simulations, [`MPI.jl`](https://github.com/JuliaParallel/MPI.jl), and
-for GPU runs, [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl). You can install
-these packages in your base environment
-```bash
-julia -E "using Pkg; Pkg.add(\"CUDA\"); Pkg.add(\"MPI\")"
-```
-Some packages come with environments that includes all possible backends
-(typically `.buildkite`). You can also consider directly using those
-environments.
-
-# Writing generic kernels
-
-To implement kernels that work across all `Device`s, `ClimaComms.jl` provides
-the [`@threaded`](@ref ClimaComms.@threaded) macro. Like the standard library's
-[`Threads.@threads`](https://docs.julialang.org/en/v1/base/multi-threading/#Base.Threads.@threads)
-macro, this can be placed in front of any `for`-loop to parallelize its
-iterations across threads. For example, given two vectors `a` and `b` of equal
-size, a threaded version of the `copyto!` function can be implemented as
-```julia-repl
-julia> threaded_copyto!(a, b) = ClimaComms.@threaded for i in axes(a, 1)
-           a[i] = b[i]
-       end
-threaded_copyto! (generic function with 1 method)
-
-julia> threaded_copyto!(a, b)
-```
-This macro offers several options for fine-tuning performance:
-- the `Device` can be specified to reduce compilation time
-- the level of thread coarsening (number of loop iterations evaluated in each
-  thread) can be specified to reduce the overhead of launching many threads
-- on GPUs, the size of each block (a collection of threads launched on a single
-  multiprocessor) can be specified to improve GPU
-  [utilization](https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#multiprocessor-level)
-
-!!! note
-    Executing code on GPUs requires *static compilation*, which means that the
-    compiler must be able to infer the types of all variables used in a threaded
-    loop. For example, global variables and type variables defined outside a
-    loop should be avoided when the loop is parallelized on a GPU. See the
-    docstring of [`@threaded`](@ref ClimaComms.@threaded) for more information.
+- [Getting Started](@ref): install `ClimaComms` and write a first script
+  that runs on any device and any number of processes.
+- [How-to Guide](@ref): recipes for common tasks, such as running on GPUs,
+  writing device-agnostic loops, and setting up logging for MPI runs.
+- [Design Philosophy](@ref): why `ClimaComms` exists, how it is designed,
+  and how the CliMA packages use it.
+- [Logging](@ref): loggers for distributed runs.
+- [Frequently Asked Questions](@ref): solutions to common problems.
+- [APIs](@ref): the complete API reference.
