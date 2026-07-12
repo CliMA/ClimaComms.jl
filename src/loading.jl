@@ -74,12 +74,36 @@ context = ClimaComms.context()
 macro import_required_backends()
     return quote
         @static if $mpi_is_required()
+            $assert_backend_available("MPI", "CLIMACOMMS_CONTEXT=\"MPI\"")
             @debug "Loading MPI via `import MPI`..."
             import MPI
         end
         @static if $cuda_is_required()
+            $assert_backend_available("CUDA", "CLIMACOMMS_DEVICE=\"CUDA\"")
             @debug "Loading CUDA via `import CUDA`..."
             import CUDA
         end
     end
+end
+
+"""
+    ClimaComms.assert_backend_available(pkgname, requested_by)
+
+Throw an informative error if the backend package `pkgname` cannot be
+loaded from the active environment. `requested_by` names the environment
+variable setting that triggered the requirement, for the error message.
+
+Called from [`@import_required_backends`](@ref) so that a missing backend
+produces an actionable message instead of a bare `import` failure.
+"""
+function assert_backend_available(pkgname, requested_by)
+    # `find_package` returns `nothing` in exactly the cases where `import`
+    # would fail with "Package not found", so checking it first only
+    # replaces the unhelpful error; it never rejects a working setup.
+    isnothing(Base.find_package(pkgname)) || return nothing
+    error(
+        "`@import_required_backends` needs to load $pkgname.jl because \
+         $requested_by, but $pkgname.jl is not available in the active \
+         environment. Install it with `import Pkg; Pkg.add(\"$pkgname\")`.",
+    )
 end

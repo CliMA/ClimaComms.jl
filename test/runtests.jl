@@ -242,6 +242,38 @@ end
     @test ClimaComms.reduce(sctx, 1.0, +) === 1.0
 end
 
+@testset "backend error hints" begin
+    # A MethodError for a ClimaComms function called with a CUDADevice /
+    # MPICommsContext should hint that the backend package is unloaded.
+    # Only meaningful when the extension is not loaded.
+    if !ClimaComms.cuda_ext_is_loaded()
+        msg = try
+            ClimaComms.array_type(ClimaComms.CUDADevice())
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("CUDA.jl is not loaded", msg)
+    end
+    if !ClimaComms.mpi_ext_is_loaded()
+        msg = try
+            ClimaComms.MPICommsContext(device)
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("MPI.jl is not loaded", msg)
+    end
+end
+
+@testset "assert_backend_available" begin
+    # A hard dependency is always available; a nonexistent package errors
+    # with an actionable message.
+    @test ClimaComms.assert_backend_available("Adapt", "test") === nothing
+    @test_throws ErrorException ClimaComms.assert_backend_available(
+        "NonexistentBackend12345",
+        "test",
+    )
+end
+
 @testset "allowscalar" begin
     a = AT(rand(3))
     local x

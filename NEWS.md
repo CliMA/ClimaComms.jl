@@ -15,6 +15,9 @@ main
   - `FileLogger` no longer crashes with an `IOError` when an MPI run reuses a `log_dir` from a previous run; the `output.log` symlink is now created up front and refreshed if stale.
   - An invalid `coarsen` option for `@threaded`/`threaded` (e.g., `:greedy` on Julia < 1.11, or a typo) now throws an `ArgumentError` instead of a `StackOverflowError`.
   - `reduce`, `allreduce`, and `gather` on `SingletonCommsContext` now return a copy of the input array instead of the input itself, matching the allocation behavior of the MPI methods.
+- More helpful error messages for missing backends:
+  - `@import_required_backends` now throws an actionable error naming the missing package and how to install it, instead of a bare `import` failure ([issue 88](https://github.com/CliMA/ClimaComms.jl/issues/88)).
+  - A `MethodError` for a `ClimaComms` function called with a `CUDADevice` or `MPICommsContext` now hints that the corresponding backend package needs to be loaded ([issue 107](https://github.com/CliMA/ClimaComms.jl/issues/107)).
 
 v0.6.10
 -------
