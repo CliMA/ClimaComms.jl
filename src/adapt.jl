@@ -1,37 +1,40 @@
 import Adapt
 
 """
-    Adapt.adapt_structure(::Type{<:AbstractArray}, context::AbstractCommsContext)
+    Adapt.adapt_structure(to::Type{<:AbstractArray}, ctx::AbstractCommsContext)
 
-Adapt a given context to a context with a device associated with the given array type.
+Adapt a given context to a context whose device is associated with the
+given array type.
 
-# Example
-
+# Examples
 ```julia
-Adapt.adapt_structure(Array, ClimaComms.context(ClimaComms.CUDADevice())) -> ClimaComms.CPUSingleThreaded()
+julia> Adapt.adapt(Array, ClimaComms.context(ClimaComms.CUDADevice()))
+ClimaComms.SingletonCommsContext{ClimaComms.CPUSingleThreaded}(ClimaComms.CPUSingleThreaded())
 ```
 
 !!! note
-    By default, adapting to `Array` creates a `CPUSingleThreaded` device, and
-    there is currently no way to conver to a CPUMultiThreaded device.
+    Adapting to `Array` always creates a [`CPUSingleThreaded`](@ref)
+    device; there is currently no way to convert to a
+    [`CPUMultiThreaded`](@ref) device.
 """
 Adapt.adapt_structure(to::Type{<:AbstractArray}, ctx::AbstractCommsContext) =
     context(Adapt.adapt(to, device(ctx)))
 
 """
-    Adapt.adapt_structure(::Type{<:AbstractArray}, device::AbstractDevice)
+    Adapt.adapt_structure(to::Type{<:AbstractArray}, device::AbstractDevice)
 
-Adapt a given device to a device associated with the given array type.
+Adapt a given device to the device associated with the given array type.
 
-# Example
-
+# Examples
 ```julia
-Adapt.adapt_structure(Array, ClimaComms.CUDADevice()) -> ClimaComms.CPUSingleThreaded()
+julia> Adapt.adapt(Array, ClimaComms.CUDADevice())
+ClimaComms.CPUSingleThreaded()
 ```
 
 !!! note
-    By default, adapting to `Array` creates a `CPUSingleThreaded` device, and
-    there is currently no way to conver to a CPUMultiThreaded device.
+    Adapting to `Array` always creates a [`CPUSingleThreaded`](@ref)
+    device; there is currently no way to convert to a
+    [`CPUMultiThreaded`](@ref) device.
 """
 Adapt.adapt_structure(::Type{<:AbstractArray}, device::AbstractDevice) =
     CPUSingleThreaded()

@@ -52,7 +52,8 @@ with_logger(logger) do
     @warn "Memory usage high"  # Written to rank-specific log file
 end
 ```
-This will output the following in both the REPL and `logs/rank_1.log`:
+This will output the following in both the REPL and the log file
+(`logs/output.log` for single-process runs, `logs/rank_1.log` for MPI runs):
 ```julia
 ┌ Warning: Memory usage high
 └ @ Main REPL[6]:2

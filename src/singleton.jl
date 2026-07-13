@@ -1,9 +1,13 @@
 """
-    SingletonCommsContext(device=device())
+    SingletonCommsContext(device = device())
 
-A singleton communications context, used for single-process runs.
-[`ClimaComms.AbstractCPUDevice`](@ref) and [`ClimaComms.CUDADevice`](@ref)
-device options are currently supported.
+A communications context for single-process runs. All communication
+primitives (e.g., [`reduce`](@ref), [`gather`](@ref), [`barrier`](@ref))
+are no-ops. [`AbstractCPUDevice`](@ref) and [`CUDADevice`](@ref) device
+options are currently supported.
+
+# Fields
+- `device`: the [`AbstractDevice`](@ref) on which computations run.
 """
 struct SingletonCommsContext{D <: AbstractDevice} <: AbstractCommsContext
     device::D
@@ -19,9 +23,14 @@ mypid(::SingletonCommsContext) = 1
 iamroot(::SingletonCommsContext) = true
 nprocs(::SingletonCommsContext) = 1
 barrier(::SingletonCommsContext) = nothing
-reduce(::SingletonCommsContext, val, op) = val
-gather(::SingletonCommsContext, array) = array
-allreduce(::SingletonCommsContext, sendbuf, op) = sendbuf
+abort(::SingletonCommsContext, status::Int) = exit(status)
+# Copy array buffers so that results do not alias inputs, matching the
+# MPI methods, which return newly allocated arrays.
+unalias(x::AbstractArray) = copy(x)
+unalias(x) = x
+reduce(::SingletonCommsContext, val, op) = unalias(val)
+gather(::SingletonCommsContext, array) = unalias(array)
+allreduce(::SingletonCommsContext, sendbuf, op) = unalias(sendbuf)
 bcast(::SingletonCommsContext, object) = object
 
 function reduce!(::SingletonCommsContext, sendbuf, recvbuf, op)
@@ -40,6 +49,12 @@ function allreduce!(::SingletonCommsContext, sendrecvbuf, op)
     return nothing
 end
 
+"""
+    SingletonGraphContext(context::SingletonCommsContext)
+
+A graph context for single-process runs; [`start`](@ref),
+[`progress`](@ref), and [`finish`](@ref) are no-ops.
+"""
 struct SingletonGraphContext <: AbstractGraphContext
     context::SingletonCommsContext
 end

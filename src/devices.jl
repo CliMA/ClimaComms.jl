@@ -1,17 +1,37 @@
 import ..ClimaComms
 import Adapt
 
+# ==============================================================================
+# Device types
+# ==============================================================================
+
 """
     AbstractDevice
 
-The base type for a device.
+The computing device on which code is executed.
+
+Devices are empty structs: they carry no data and exist so that multiple
+dispatch can select device-specific implementations (e.g., `Array` vs.
+`CuArray`, a serial loop vs. a CUDA kernel).
+
+Subtypes:
+- [`CPUSingleThreaded`](@ref): a CPU using a single thread.
+- [`CPUMultiThreaded`](@ref): a CPU using multiple threads.
+- [`CUDADevice`](@ref): a single CUDA-enabled GPU.
+
+Use [`device`](@ref) to select a device at runtime from the
+`CLIMACOMMS_DEVICE` environment variable.
 """
 abstract type AbstractDevice end
 
 """
-    AbstractCPUDevice()
+    AbstractCPUDevice
 
 Abstract device type for single-threaded and multi-threaded CPU runs.
+
+Subtypes:
+- [`CPUSingleThreaded`](@ref): a CPU using a single thread.
+- [`CPUMultiThreaded`](@ref): a CPU using multiple threads.
 """
 abstract type AbstractCPUDevice <: AbstractDevice end
 
@@ -19,34 +39,50 @@ abstract type AbstractCPUDevice <: AbstractDevice end
 """
     CPUSingleThreaded()
 
-Use the CPU with single thread.
+Use the CPU with a single thread.
 """
 struct CPUSingleThreaded <: AbstractCPUDevice end
 
 """
     CPUMultiThreaded()
 
-Use the CPU with multiple thread.
+Use the CPU with multiple threads.
 """
 struct CPUMultiThreaded <: AbstractCPUDevice end
 
 """
     CUDADevice()
 
-Use NVIDIA GPU accelarator
+Use an NVIDIA GPU via [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl).
+
+`CUDA.jl` must be loaded for this device to be usable; see
+[`@import_required_backends`](@ref).
 """
 struct CUDADevice <: AbstractDevice end
+
+# ==============================================================================
+# Device selection and introspection
+# ==============================================================================
 
 """
     ClimaComms.device_functional(device)
 
-Return true when the `device` is correctly set up.
+Return `true` when the `device` is correctly set up (e.g., for a
+[`CUDADevice`](@ref), when CUDA is available and functional).
 """
 function device_functional end
 
 device_functional(::CPUSingleThreaded) = true
 device_functional(::CPUMultiThreaded) = true
 
+"""
+    ClimaComms.device_type()
+
+Return the type of device requested by the `CLIMACOMMS_DEVICE` environment
+variable, as a `Symbol` (e.g., `:CPUSingleThreaded` or `:CUDADevice`).
+
+Called from [`device`](@ref), which constructs the device instance.
+"""
 function device_type()
     env_var = get(ENV, "CLIMACOMMS_DEVICE", "CPU")
     if env_var == "CPU"
@@ -65,15 +101,24 @@ end
 """
     ClimaComms.device()
 
-Determine the device to use depending on the `CLIMACOMMS_DEVICE` environment variable.
+Construct the device specified by the `CLIMACOMMS_DEVICE` environment
+variable.
 
-Allowed values:
-- `CPU`, single-threaded or multi-threaded depending on the number of threads;
-- `CPUSingleThreaded`,
-- `CPUMultiThreaded`,
-- `CUDA`.
+Allowed values of `CLIMACOMMS_DEVICE`:
+- `CPU` (default): [`CPUSingleThreaded`](@ref) or
+  [`CPUMultiThreaded`](@ref), depending on the number of Julia threads;
+- `CPUSingleThreaded`;
+- `CPUMultiThreaded`;
+- `CUDA`: [`CUDADevice`](@ref), which requires `CUDA.jl` to be loaded (see
+  [`@import_required_backends`](@ref)).
 
-The default is `CPU`.
+# Examples
+```julia
+device = ClimaComms.device()
+ArrayType = ClimaComms.array_type(device)
+```
+
+See also [`context`](@ref).
 """
 function device()
     target_device = device_type()
@@ -86,40 +131,58 @@ function device()
     return DeviceConstructor()
 end
 
-Base.summary(io::IO, device::AbstractDevice) = string(device_type())
+Base.summary(io::IO, device::AbstractDevice) =
+    print(io, nameof(typeof(device)))
 
 """
-    ClimaComms.array_type(::AbstractDevice)
+    ClimaComms.array_type(device::AbstractDevice)
 
-The base array type used by the specified device (currently `Array` or `CuArray`).
+Return the base array type used by the specified device (currently `Array`
+or `CuArray`).
+
+# Examples
+```julia
+ArrayType = ClimaComms.array_type(ClimaComms.device())
+x = ArrayType([1.0, 2.0, 3.0])
+```
 """
 array_type(::AbstractCPUDevice) = Array
 
 """
-Internal function that can be used to assign a device to a process.
+    ClimaComms._assign_device(device, id)
 
-Currently used to assign CUDADevices to MPI ranks.
+Assign the given `device` to the process identified by `id`; a no-op for
+CPU devices.
+
+Called from [`init`](@ref) to distribute GPUs among the MPI ranks on each
+node.
 """
 _assign_device(device, id) = nothing
 
 """
     ClimaComms.free_memory(device)
 
-Bytes of memory that are currently available for allocation on the `device`.
+Return the bytes of memory that are currently available for allocation on
+the `device`.
 """
 free_memory(::AbstractCPUDevice) = Sys.free_memory()
 
 """
     ClimaComms.total_memory(device)
 
-Bytes of memory that are theoretically available for allocation on the `device`.
+Return the bytes of memory that are theoretically available for allocation
+on the `device`.
 """
 total_memory(::AbstractCPUDevice) = Sys.total_memory()
 
-"""
-    @time f(args...; kwargs...)
+# ==============================================================================
+# Device-flexible operations
+# ==============================================================================
 
-Device-flexible `@time`:
+"""
+    ClimaComms.time(f, device, args...; kwargs...)
+
+Device-flexible version of `@time`; functional form of [`@time`](@ref).
 
 Calls
 ```julia
@@ -138,9 +201,10 @@ function time(f::F, device::AbstractCPUDevice, args...; kwargs...) where {F}
 end
 
 """
-    elapsed(f::F, device::AbstractDevice, args...; kwargs...)
+    ClimaComms.elapsed(f, device, args...; kwargs...)
 
-Device-flexible `elapsed`.
+Device-flexible version of `@elapsed`; functional form of
+[`@elapsed`](@ref).
 
 Calls
 ```julia
@@ -159,9 +223,9 @@ function elapsed(f::F, device::AbstractCPUDevice, args...; kwargs...) where {F}
 end
 
 """
-    sync(f, ::AbstractDevice, args...; kwargs...)
+    ClimaComms.sync(f, device, args...; kwargs...)
 
-Device-flexible function that calls `@sync`.
+Device-flexible version of `@sync`; functional form of [`@sync`](@ref).
 
 Calls
 ```julia
@@ -199,9 +263,10 @@ function sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
 end
 
 """
-    cuda_sync(f, ::AbstractDevice, args...; kwargs...)
+    ClimaComms.cuda_sync(f, device, args...; kwargs...)
 
-Device-flexible function that (may) call `CUDA.@sync`.
+Device-flexible version of `CUDA.@sync`; functional form of
+[`@cuda_sync`](@ref).
 
 Calls
 ```julia
@@ -218,7 +283,7 @@ function cuda_sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
 end
 
 """
-    allowscalar(f, ::AbstractDevice, args...; kwargs...)
+    ClimaComms.allowscalar(f, device, args...; kwargs...)
 
 Device-flexible version of `CUDA.@allowscalar`.
 
@@ -240,6 +305,10 @@ end
 ```
 """
 allowscalar(f, ::AbstractCPUDevice, args...; kwargs...) = f(args...; kwargs...)
+
+# ==============================================================================
+# Device-flexible macros
+# ==============================================================================
 
 """
     @time device expr
@@ -359,9 +428,20 @@ macro assert(device, cond, text = nothing)
     text_func = isnothing(text) ? nothing : :(() -> $(esc(text)))
     return :($assert($(esc(device)), () -> $(esc(cond)), $text_func))
 end
+
+"""
+    ClimaComms.assert(device, cond, text)
+
+Evaluate the thunks `cond` and `text` in a device-appropriate assertion.
+Called from [`@assert`](@ref); the CUDA method is defined in
+`ClimaCommsCUDAExt`.
+"""
 assert(::AbstractCPUDevice, cond::C, text::T) where {C, T} =
     isnothing(text) ? (Base.@assert cond()) : (Base.@assert cond() text())
 
+# ==============================================================================
+# Threaded loops: @threaded, threaded, and run_threaded
+# ==============================================================================
 
 """
     @threaded [device] [coarsen=...] [block_size=...] for ... end
@@ -423,10 +503,12 @@ compatible with `@threaded`. (Although these iterators do not define methods for
 over a single `Iterators.product`, with the innermost iterator of the loop
 appearing first in the product, and the outermost iterator appearing last.
 
-NOTE: When a value in the body of the loop has a type that cannot be inferred by
-the compiler, an `InvalidIRError` will be thrown during compilation for a
-`CUDADevice()`. In particular, global variables are not inferrable, so
-`@threaded` must be wrapped in a function whenever it is used in the REPL:
+!!! note
+    When a value in the body of the loop has a type that cannot be inferred
+    by the compiler, an `InvalidIRError` will be thrown during compilation
+    for a `CUDADevice()`. In particular, global variables are not
+    inferrable, so `@threaded` must be wrapped in a function whenever it is
+    used in the REPL:
 
 ```julia-repl
 julia> a = CUDA.CuArray{Int}(undef, 100); b = similar(a);
@@ -534,10 +616,10 @@ macro threaded(args...)
 end
 
 """
-    threaded(f, device, itrs...; kwargs...)
+    ClimaComms.threaded(f, device, itrs...; kwargs...)
 
-Functional form of `@threaded`. If there are `n` iterators and `f` is a function
-of `n` arguments, the `threaded` function is similar to
+Functional form of [`@threaded`](@ref). If there are `n` iterators and `f`
+is a function of `n` arguments, the `threaded` function is similar to
 
 ```julia
 @threaded device [kwargs...] for xₙ in itrs[n], ..., x₂ in itrs[2], x₁ in itrs[1]
@@ -563,6 +645,16 @@ threaded(
 ) where {F} =
     run_threaded(f, device, coarsen, threadable(device, itr); block_size)
 
+"""
+    ClimaComms.run_threaded(f, device, coarsen, itr; block_size)
+
+Evaluate `f` on every item of `itr`, distributed across threads according
+to the `device` and the `coarsen` scheduler.
+
+Called from [`threaded`](@ref) after the iterator has been made indexable
+by [`threadable`](@ref); the CUDA methods are defined in
+`ClimaCommsCUDAExt`.
+"""
 run_threaded(f::F, device::AbstractCPUDevice, coarsen, itr; _...) where {F} =
     run_threaded(f, device, coarsen, itr)
 
@@ -588,6 +680,18 @@ run_threaded(f::F, ::CPUMultiThreaded, ::Val{:static}, itr) where {F} =
         end
 end
 
+# Fallback for scheduler symbols with no matching method; without it, the
+# keyword-stripping method above re-dispatches to itself and overflows the
+# stack.
+run_threaded(f::F, ::CPUMultiThreaded, coarsen, itr) where {F} =
+    throw(
+        ArgumentError(
+            "Invalid `coarsen` value: $(coarsen isa Val ? coarsen : repr(coarsen)). " *
+            "Expected `:dynamic`, `:static`, `:greedy` (requires Julia 1.11 " *
+            "or greater), or a positive `Int`.",
+        ),
+    )
+
 function run_threaded(
     f::F,
     ::CPUMultiThreaded,
@@ -605,11 +709,16 @@ function run_threaded(
     end
 end
 
-"""
-    threadable(device, itr)
+# ==============================================================================
+# Threadable iterator wrappers
+# ==============================================================================
 
-Modifies an iterator to ensure that it can be used in a `@threaded` loop. This
-will typically return `itr` or a `ThreadableWrapper` of `itr`.
+"""
+    ClimaComms.threadable(device, itr)
+
+Return a version of the iterator `itr` that can be used in a
+[`@threaded`](@ref) loop; either `itr` itself or a
+[`ThreadableWrapper`](@ref) of `itr`.
 """
 threadable(_, itr) = itr
 

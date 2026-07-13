@@ -8,12 +8,14 @@ CurrentModule = ClimaComms
 ClimaComms
 ```
 
-## Loading
+## Loading backends
 
 ```@docs
 ClimaComms.@import_required_backends
 ClimaComms.cuda_is_required
 ClimaComms.mpi_is_required
+ClimaComms.cuda_ext_is_loaded
+ClimaComms.mpi_ext_is_loaded
 ```
 
 ## Devices
@@ -27,13 +29,29 @@ ClimaComms.CUDADevice
 ClimaComms.device
 ClimaComms.device_functional
 ClimaComms.array_type
-ClimaComms.allowscalar
+ClimaComms.free_memory
+ClimaComms.total_memory
+Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractDevice)
+```
+
+### Device-flexible operations
+
+```@docs
 ClimaComms.@time
 ClimaComms.@elapsed
 ClimaComms.@assert
 ClimaComms.@sync
 ClimaComms.@cuda_sync
-Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractDevice)
+ClimaComms.time
+ClimaComms.elapsed
+ClimaComms.sync
+ClimaComms.cuda_sync
+ClimaComms.allowscalar
+```
+
+### Threaded loops
+
+```@docs
 ClimaComms.@threaded
 ClimaComms.threaded
 ClimaComms.threadable
@@ -46,18 +64,9 @@ ClimaComms.ThreadableWrapper
 ClimaComms.AbstractCommsContext
 ClimaComms.SingletonCommsContext
 ClimaComms.MPICommsContext
-ClimaComms.AbstractGraphContext
 ClimaComms.context
-ClimaComms.graph_context
+ClimaComms.local_communicator
 Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractCommsContext)
-```
-
-## Logging
-
-```@docs
-ClimaComms.OnlyRootLogger
-ClimaComms.MPILogger
-ClimaComms.FileLogger
 ```
 
 ## Context operations
@@ -79,13 +88,29 @@ ClimaComms.reduce!
 ClimaComms.allreduce
 ClimaComms.allreduce!
 ClimaComms.bcast
+ClimaComms.gather
 ```
 
 ### Graph exchange
 
 ```@docs
+ClimaComms.AbstractGraphContext
+ClimaComms.graph_context
 ClimaComms.start
 ClimaComms.progress
 ClimaComms.finish
 ```
 
+## Loggers
+
+```@docs
+ClimaComms.OnlyRootLogger
+ClimaComms.MPILogger
+ClimaComms.FileLogger
+```
+
+## Utilities
+
+```@docs
+ClimaComms.with_tempdir
+```
