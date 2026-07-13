@@ -3,8 +3,9 @@ ClimaComms.jl Release Notes
 
 main
 -------
+
 - ci: update JuliaFormatter job [PR 127](https://github.com/CliMA/ClimaComms.jl/pull/127)
-- ci: GitHub Actions now tests Julia 1.10 (LTS) in addition to 1.11.
+- ci: GitHub Actions now tests Julia 1.10 (LTS) to 1.12.
 - The minimum supported Julia version was raised from 1.9 to 1.10 (the LTS); 1.9 was declared but never tested in CI.
 - Documentation overhaul: new README and logo, restructured docs (getting started, how-to guide, design philosophy), and revised docstrings throughout.
 - `FileLogger` is now exported, replacing the stale export of the removed `MPIFileLogger`.
@@ -21,22 +22,27 @@ main
 
 v0.6.10
 -------
+
 - fixed logging interoperability with `GPUCompiler.jl` [PR 119](https://github.com/CliMA/ClimaComms.jl/pull/119)
 
 v0.6.9
 -------
+
 - Added a device-agnostic API for querying available memory [PR 117](https://github.com/CliMA/ClimaComms.jl/pull/117).
 
 v0.6.8
 -------
+
 - Extended `@threaded` to work with multiple iterators and lazy iterators (e.g., `enumerate`, `zip`, and `Iterators.partition`), and modified the `threaded` function to make it equivalent to `@threaded` [PR 115](https://github.com/CliMA/ClimaComms.jl/pull/115).
 
 v0.6.7
 -------
+
 - Extended `@threaded` to work on GPU devices, with block sizes automatically determined by the CUDA occupancy API, and added the ability to control thread coarsening across all devices [PR 111](https://github.com/CliMA/ClimaComms.jl/pull/111).
 
 v0.6.6
 -------
+
 - Replaced `MPIFileLogger` with `FileLogger` and added an `OnlyRootLogger` logger that silences non-root processes [PR 104](https://github.com/CliMA/ClimaComms.jl/pull/104).
 
 v0.6.5
@@ -77,14 +83,18 @@ v0.6.0
   use `CUDA`/`MPI`, `CUDA.jl`/`MPI.jl` have to be loaded. A convenience macro
   `ClimaComms.@import_required_backends` checks what device/context could be
   used and conditionally loads `CUDA.jl`/`MPI.jl`. It is recommended to change
+
   ```julia
   import ClimaComms
   ```
-  to 
+
+  to
+
   ```julia
   import ClimaComms
   ClimaComms.@import_required_backends
   ```
+
   This has to be done before calling `ClimaComms.context()`.
 
 [badge-💥breaking]: https://img.shields.io/badge/💥BREAKING-red.svg

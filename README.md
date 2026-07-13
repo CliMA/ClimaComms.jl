@@ -12,18 +12,24 @@ and across many nodes with MPI — the device and the parallelism are selected a
 runtime, typically through environment variables.
 
 |||
-|-----------------------------:|:-------------------------------------------------|
-| **Documentation**            | [![dev][docs-latest-img]][docs-latest-url]       |
-| **Docs Build**               | [![docs build][docs-bld-img]][docs-bld-url]      |
-| **GHA CI**                   | [![gha ci][gha-ci-img]][gha-ci-url]              |
-| **Buildkite CI**             | [![buildkite ci][bk-ci-img]][bk-ci-url]          |
-| **Downloads**                | [![Downloads][dlt-img]][dlt-url]                 |
+|------------------:|:------------------------------------------------------------|
+| **Documentation** | [![stable][docs-stable-img]][docs-stable-url] [![dev][docs-dev-img]][docs-dev-url] |
+| **Version**       | [![version][version-img]][version-url]                      |
+| **License**       | [![license][license-img]][license-url]                      |
+| **Tests**         | [![gha ci][gha-ci-img]][gha-ci-url] [![buildkite][bk-ci-img]][bk-ci-url] |
+| **Downloads**     | [![Downloads][dlt-img]][dlt-url]                            |
 
-[docs-latest-img]: https://img.shields.io/badge/docs-dev-blue.svg
-[docs-latest-url]: https://CliMA.github.io/ClimaComms.jl/dev/
+[docs-stable-img]: https://img.shields.io/badge/docs-stable-blue.svg
+[docs-stable-url]: https://CliMA.github.io/ClimaComms.jl/stable/
 
-[docs-bld-img]: https://github.com/CliMA/ClimaComms.jl/actions/workflows/docs.yml/badge.svg
-[docs-bld-url]: https://github.com/CliMA/ClimaComms.jl/actions/workflows/docs.yml
+[docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
+[docs-dev-url]: https://CliMA.github.io/ClimaComms.jl/dev/
+
+[version-img]: https://juliahub.com/docs/General/ClimaComms/stable/version.svg
+[version-url]: https://juliahub.com/ui/Packages/General/ClimaComms
+
+[license-img]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
+[license-url]: https://github.com/CliMA/ClimaComms.jl/blob/main/LICENSE
 
 [gha-ci-img]: https://github.com/CliMA/ClimaComms.jl/actions/workflows/OS-Tests.yml/badge.svg
 [gha-ci-url]: https://github.com/CliMA/ClimaComms.jl/actions/workflows/OS-Tests.yml
