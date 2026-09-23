@@ -4,7 +4,10 @@ ClimaComms.jl Release Notes
 main
 -------
 
-- ci: update JuliaFormatter job [PR 127](https://github.com/CliMA/ClimaComms.jl/pull/127)
+v0.6.12
+-------
+
+- `MPICommsContext` operations now synchronize the CUDA device across streams, so that CUDA-aware MPI sees device buffers written by kernels on CUDA.jl's non-blocking per-task streams. The new `ClimaComms.device_synchronize(device)` is called in `start` and `finish` and around `reduce`, `reduce!`, `allreduce`, `allreduce!`, and `gather` on array buffers; `reduce!` and `allreduce!` now return `nothing`, as documented [PR 151](https://github.com/CliMA/ClimaComms.jl/pull/151).
 - ci: GitHub Actions now tests Julia 1.10 (LTS) to 1.12.
 - The minimum supported Julia version was raised from 1.9 to 1.10 (the LTS); 1.9 was declared but never tested in CI.
 - Documentation overhaul: new README and logo, restructured docs (getting started, how-to guide, design philosophy), and revised docstrings throughout.
@@ -19,6 +22,11 @@ main
 - More helpful error messages for missing backends:
   - `@import_required_backends` now throws an actionable error naming the missing package and how to install it, instead of a bare `import` failure ([issue 88](https://github.com/CliMA/ClimaComms.jl/issues/88)).
   - A `MethodError` for a `ClimaComms` function called with a `CUDADevice` or `MPICommsContext` now hints that the corresponding backend package needs to be loaded ([issue 107](https://github.com/CliMA/ClimaComms.jl/issues/107)).
+
+v0.6.11
+-------
+
+- ci: update JuliaFormatter job [PR 127](https://github.com/CliMA/ClimaComms.jl/pull/127)
 
 v0.6.10
 -------

@@ -63,28 +63,70 @@ ClimaComms.nprocs(ctx::ClimaComms.MPICommsContext) = MPI.Comm_size(ctx.mpicomm)
 
 ClimaComms.barrier(ctx::ClimaComms.MPICommsContext) = MPI.Barrier(ctx.mpicomm)
 
-ClimaComms.reduce(ctx::ClimaComms.MPICommsContext, val, op) =
-    MPI.Reduce(val, op, 0, ctx.mpicomm)
+# Order MPI operations on array buffers, which may reside in device memory, with
+# work queued on the device's streams. Scalars and Refs are host values that
+# need no synchronization.
+_device_synchronize(ctx, buf) = nothing
+_device_synchronize(ctx, ::Union{AbstractArray, MPI.Buffer}) =
+    ClimaComms.device_synchronize(ClimaComms.device(ctx))
 
-ClimaComms.reduce!(ctx::ClimaComms.MPICommsContext, sendbuf, recvbuf, op) =
+function ClimaComms.reduce(ctx::ClimaComms.MPICommsContext, val, op)
+    _device_synchronize(ctx, val)
+    res = MPI.Reduce(val, op, 0, ctx.mpicomm)
+    _device_synchronize(ctx, val)
+    return res
+end
+
+function ClimaComms.reduce!(
+    ctx::ClimaComms.MPICommsContext,
+    sendbuf,
+    recvbuf,
+    op,
+)
+    _device_synchronize(ctx, sendbuf)
     MPI.Reduce!(sendbuf, recvbuf, op, ctx.mpicomm; root = 0)
+    _device_synchronize(ctx, sendbuf)
+    return nothing
+end
 
-ClimaComms.reduce!(ctx::ClimaComms.MPICommsContext, sendrecvbuf, op) =
+function ClimaComms.reduce!(ctx::ClimaComms.MPICommsContext, sendrecvbuf, op)
+    _device_synchronize(ctx, sendrecvbuf)
     MPI.Reduce!(sendrecvbuf, op, ctx.mpicomm; root = 0)
+    _device_synchronize(ctx, sendrecvbuf)
+    return nothing
+end
 
-ClimaComms.allreduce(ctx::ClimaComms.MPICommsContext, sendbuf, op) =
-    MPI.Allreduce(sendbuf, op, ctx.mpicomm)
+function ClimaComms.allreduce(ctx::ClimaComms.MPICommsContext, sendbuf, op)
+    _device_synchronize(ctx, sendbuf)
+    res = MPI.Allreduce(sendbuf, op, ctx.mpicomm)
+    _device_synchronize(ctx, sendbuf)
+    return res
+end
 
-ClimaComms.allreduce!(ctx::ClimaComms.MPICommsContext, sendbuf, recvbuf, op) =
+function ClimaComms.allreduce!(
+    ctx::ClimaComms.MPICommsContext,
+    sendbuf,
+    recvbuf,
+    op,
+)
+    _device_synchronize(ctx, sendbuf)
     MPI.Allreduce!(sendbuf, recvbuf, op, ctx.mpicomm)
+    _device_synchronize(ctx, sendbuf)
+    return nothing
+end
 
-ClimaComms.allreduce!(ctx::ClimaComms.MPICommsContext, sendrecvbuf, op) =
+function ClimaComms.allreduce!(ctx::ClimaComms.MPICommsContext, sendrecvbuf, op)
+    _device_synchronize(ctx, sendrecvbuf)
     MPI.Allreduce!(sendrecvbuf, op, ctx.mpicomm)
+    _device_synchronize(ctx, sendrecvbuf)
+    return nothing
+end
 
 ClimaComms.bcast(ctx::ClimaComms.MPICommsContext, object) =
     MPI.bcast(object, ctx.mpicomm; root = 0)
 
 function ClimaComms.gather(ctx::ClimaComms.MPICommsContext, array)
+    ClimaComms.device_synchronize(ClimaComms.device(ctx))
     dims = size(array)
     lengths = MPI.Gather(dims[end], 0, ctx.mpicomm)
     if ClimaComms.iamroot(ctx)
@@ -94,7 +136,9 @@ function ClimaComms.gather(ctx::ClimaComms.MPICommsContext, array)
     else
         recvbuf = nothing
     end
-    MPI.Gatherv!(array, recvbuf, 0, ctx.mpicomm)
+    res = MPI.Gatherv!(array, recvbuf, 0, ctx.mpicomm)
+    ClimaComms.device_synchronize(ClimaComms.device(ctx))
+    return res
 end
 
 ClimaComms.abort(ctx::ClimaComms.MPICommsContext, status::Int) =
@@ -250,6 +294,7 @@ function ClimaComms.start(
     if !all(MPI.isnull, ghost.recv_reqs)
         error("Must finish() before next start()")
     end
+    ClimaComms.device_synchronize(ClimaComms.device(ghost.ctx))
     # post receives
     for n in 1:length(ghost.recv_bufs)
         MPI.Irecv!(
@@ -276,6 +321,7 @@ function ClimaComms.start(
     ghost::MPIPersistentSendRecvGraphContext;
     dependencies = nothing,
 )
+    ClimaComms.device_synchronize(ClimaComms.device(ghost.ctx))
     MPI.Startall(ghost.recv_reqs) # post receives
     MPI.Startall(ghost.send_reqs) # post sends
 end
@@ -299,6 +345,7 @@ function ClimaComms.finish(
     # ensure that sends have completed
     # TODO: these could be moved to start()? but we would need to add a finalizer to make sure they complete.
     MPI.Waitall(ghost.send_reqs)
+    ClimaComms.device_synchronize(ClimaComms.device(ghost.ctx))
 end
 
 function Base.summary(io::IO, ctx::ClimaComms.MPICommsContext)

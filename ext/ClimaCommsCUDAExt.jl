@@ -11,6 +11,11 @@ function ClimaComms._assign_device(::CUDADevice, rank_number)
     return nothing
 end
 
+function ClimaComms.device_synchronize(::CUDADevice)
+    CUDA.device_synchronize()
+    return nothing
+end
+
 function Base.summary(io::IO, ::CUDADevice)
     dev = CUDA.device()
     name = CUDA.name(dev)
