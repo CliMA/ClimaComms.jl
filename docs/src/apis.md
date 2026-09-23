@@ -31,6 +31,7 @@ ClimaComms.device_functional
 ClimaComms.array_type
 ClimaComms.free_memory
 ClimaComms.total_memory
+ClimaComms.device_synchronize
 Adapt.adapt_structure(::Type{<:AbstractArray}, ::ClimaComms.AbstractDevice)
 ```
 

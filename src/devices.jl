@@ -160,6 +160,20 @@ node.
 _assign_device(device, id) = nothing
 
 """
+    ClimaComms.device_synchronize(device)
+
+Synchronize all work queued on `device` across all streams; a no-op for CPU
+devices.
+
+Called from [`start`](@ref) and [`finish`](@ref) on MPI graph contexts, and
+around MPI collectives on array buffers ([`reduce`](@ref), [`reduce!`](@ref),
+[`allreduce`](@ref), [`allreduce!`](@ref), and [`gather`](@ref)), to order
+GPU kernels on Julia's per-task non-blocking stream (`CUDA.stream()`) with
+CUDA-aware MPI / UCX operations that run on separate CUDA streams.
+"""
+device_synchronize(::AbstractDevice) = nothing
+
+"""
     ClimaComms.free_memory(device)
 
 Return the bytes of memory that are currently available for allocation on
