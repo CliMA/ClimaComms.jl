@@ -54,8 +54,8 @@ identity_copy!(∂ⁿa∂xⁿ, a, device) = ClimaComms.@cuda_sync device begin
         @inbounds ∂ⁿa∂xⁿ[x, y] = a[x, y]
     end
 end
-ident_first_time = @elapsed identity_copy_reference!(∂ⁿa∂xⁿ, a, device)
-ident_time = @elapsed identity_copy_reference!(∂ⁿa∂xⁿ, a, device)
+ident_first_time = @elapsed identity_copy!(∂ⁿa∂xⁿ, a, device)
+ident_time = @elapsed identity_copy!(∂ⁿa∂xⁿ, a, device)
 @info "@threaded identity copy, n = 0:"
 @info "    Latency = $(round(ident_first_time - ident_time; sigdigits = 3)) s"
 print_time_and_bandwidth(device, 2 * sizeof(a), ident_time)
