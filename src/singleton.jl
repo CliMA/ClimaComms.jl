@@ -3,8 +3,8 @@
 
 A communications context for single-process runs. All communication
 primitives (e.g., [`reduce`](@ref), [`gather`](@ref), [`barrier`](@ref))
-are no-ops. [`AbstractCPUDevice`](@ref) and [`CUDADevice`](@ref) device
-options are currently supported.
+are no-ops. [`AbstractCPUDevice`](@ref) and [`AbstractGPUDevice`](@ref)
+device options are currently supported.
 
 # Fields
 - `device`: the [`AbstractDevice`](@ref) on which computations run.

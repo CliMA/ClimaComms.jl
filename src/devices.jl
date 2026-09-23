@@ -18,6 +18,7 @@ Subtypes:
 - [`CPUSingleThreaded`](@ref): a CPU using a single thread.
 - [`CPUMultiThreaded`](@ref): a CPU using multiple threads.
 - [`CUDADevice`](@ref): a single CUDA-enabled GPU.
+- [`MetalDevice`](@ref): a single Apple GPU.
 
 Use [`device`](@ref) to select a device at runtime from the
 `CLIMACOMMS_DEVICE` environment variable.
@@ -65,6 +66,7 @@ The extension of each GPU backend defines:
 
 Subtypes:
 - [`CUDADevice`](@ref): a single CUDA-enabled GPU.
+- [`MetalDevice`](@ref): a single Apple GPU.
 """
 abstract type AbstractGPUDevice <: AbstractDevice end
 
@@ -77,6 +79,16 @@ Use an NVIDIA GPU via [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl).
 [`@import_required_backends`](@ref).
 """
 struct CUDADevice <: AbstractGPUDevice end
+
+"""
+    MetalDevice()
+
+Use an Apple GPU via [`Metal.jl`](https://github.com/JuliaGPU/Metal.jl).
+
+`Metal.jl` must be loaded for this device to be usable; see
+[`@import_required_backends`](@ref). Apple GPUs do not support `Float64`.
+"""
+struct MetalDevice <: AbstractGPUDevice end
 
 # ==============================================================================
 # Device selection and introspection
@@ -111,6 +123,8 @@ function device_type()
         return :CPUMultiThreaded
     elseif env_var == "CUDA"
         return :CUDADevice
+    elseif env_var == "Metal"
+        return :MetalDevice
     else
         error("Invalid CLIMACOMMS_DEVICE: $env_var")
     end
@@ -128,7 +142,8 @@ Allowed values of `CLIMACOMMS_DEVICE`:
 - `CPUSingleThreaded`;
 - `CPUMultiThreaded`;
 - `CUDA`: [`CUDADevice`](@ref), which requires `CUDA.jl` to be loaded (see
-  [`@import_required_backends`](@ref)).
+  [`@import_required_backends`](@ref));
+- `Metal`: [`MetalDevice`](@ref), which requires `Metal.jl` to be loaded.
 
 # Examples
 ```julia
@@ -144,6 +159,10 @@ function device()
         error(
             "Loading CUDA.jl is required to use CUDADevice. You might want to call ClimaComms.@import_required_backends",
         )
+    elseif target_device == :MetalDevice && !metal_ext_is_loaded()
+        error(
+            "Loading Metal.jl is required to use MetalDevice. You might want to call ClimaComms.@import_required_backends",
+        )
     end
     DeviceConstructor = getproperty(ClimaComms, target_device)
     return DeviceConstructor()
@@ -155,8 +174,8 @@ Base.summary(io::IO, device::AbstractDevice) =
 """
     ClimaComms.array_type(device::AbstractDevice)
 
-Return the base array type used by the specified device (currently `Array`
-or `CuArray`).
+Return the base array type used by the specified device (currently `Array`,
+`CuArray`, or `MtlArray`).
 
 # Examples
 ```julia
@@ -214,6 +233,7 @@ Return `true` if the `device` can store `Float64` arrays and
   evaluate `Float64` arithmetic in kernels.
 """
 supports_float64(::AbstractDevice) = true
+supports_float64(::MetalDevice) = false
 
 # ==============================================================================
 # Device-flexible operations
@@ -489,7 +509,9 @@ for CPU devices and
 ```julia
 CUDA.@cuassert cond [text]
 ```
-for CUDA devices.
+for CUDA devices. On a Metal device, `text` is not evaluated, and a failed
+assertion in a kernel throws a `KernelException` on the host at the next
+synchronization.
 """
 macro assert(device, cond, text = nothing)
     text_func = isnothing(text) ? nothing : :(() -> $(esc(text)))
@@ -500,8 +522,8 @@ end
     ClimaComms.assert(device, cond, text)
 
 Evaluate the thunks `cond` and `text` in a device-appropriate assertion.
-Called from [`@assert`](@ref); the CUDA method is defined in
-`ClimaCommsCUDAExt`.
+Called from [`@assert`](@ref); the GPU methods are defined in the backend
+extensions, and the Metal method does not evaluate `text`.
 """
 assert(::AbstractCPUDevice, cond::C, text::T) where {C, T} =
     isnothing(text) ? (Base.@assert cond()) : (Base.@assert cond() text())
