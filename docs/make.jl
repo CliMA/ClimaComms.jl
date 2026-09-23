@@ -19,6 +19,7 @@ makedocs(
         "Design Philosophy" => "philosophy.md",
         "Logging" => "logging.md",
         "Frequently Asked Questions" => "faqs.md",
+        "Implementing a New Backend" => "backends.md",
         "APIs" => "apis.md",
     ],
 )
