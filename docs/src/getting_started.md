@@ -20,6 +20,7 @@ dependencies):
 
 ```julia
 Pkg.add("CUDA")   # for NVIDIA GPUs
+Pkg.add("Metal")  # for Apple GPUs (Float32 only)
 Pkg.add("MPI")    # for distributed runs
 ```
 
@@ -30,7 +31,7 @@ Save the following as `script.jl`:
 ```julia
 import ClimaComms
 
-# Load MPI.jl and/or CUDA.jl if the environment variables request them.
+# Load MPI.jl, CUDA.jl, or Metal.jl, as the environment variables request.
 ClimaComms.@import_required_backends
 
 # Select the context and device from the environment variables.
@@ -41,9 +42,10 @@ device = ClimaComms.device(context)
 # Returns this process's ID (1-based) and the total number of processes.
 mypid, nprocs = ClimaComms.init(context)
 
-# Allocate an array on the selected device (Array on CPUs, CuArray on GPUs).
+# Allocate an array on the selected device (Array on CPUs, CuArray or
+# MtlArray on GPUs). Apple GPUs do not support Float64, so the array is Float32.
 ArrayType = ClimaComms.array_type(device)
-my_array = mypid * ArrayType([1.0, 1.0, 1.0])
+my_array = mypid * ArrayType([1.0f0, 1.0f0, 1.0f0])
 
 # Sum the arrays from all processes; the result is valid on the root process.
 reduced_array = ClimaComms.reduce(context, my_array, +)
@@ -52,9 +54,9 @@ ClimaComms.iamroot(context) && @show reduced_array
 
 Walking through the pieces:
 
-- [`ClimaComms.@import_required_backends`](@ref) imports `MPI.jl` and/or
-  `CUDA.jl` when the environment variables request them, so you do not have
-  to edit the script to switch backends. The packages must be installed in
+- [`ClimaComms.@import_required_backends`](@ref) imports `MPI.jl`, `CUDA.jl`,
+  or `Metal.jl`, as the environment variables request, so you do not have to
+  edit the script to switch backends. The packages must be installed in
   your environment. (Only use this macro in scripts, never in library code.)
 - [`ClimaComms.context`](@ref) reads `CLIMACOMMS_CONTEXT` and returns a
   [`SingletonCommsContext`](@ref ClimaComms.SingletonCommsContext) (the
@@ -82,6 +84,12 @@ On a GPU (requires `CUDA.jl` and a CUDA-capable GPU):
 
 ```bash
 CLIMACOMMS_DEVICE=CUDA julia --project script.jl
+```
+
+On an Apple GPU (requires `Metal.jl`):
+
+```bash
+CLIMACOMMS_DEVICE=Metal julia --project script.jl
 ```
 
 On four MPI processes (requires `MPI.jl`):

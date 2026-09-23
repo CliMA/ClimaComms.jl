@@ -61,10 +61,11 @@ and pass it (or its device) down to the code that needs it.
 ## Backends as package extensions
 
 `ClimaComms` itself depends only on `Adapt.jl` and Julia's logging
-packages. The CUDA and MPI implementations live in [package
+packages. The CUDA, Metal, and MPI implementations live in [package
 extensions](https://pkgdocs.julialang.org/v1/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions))
-(`ext/ClimaCommsCUDAExt.jl` and `ext/ClimaCommsMPIExt.jl`) that Julia loads
-automatically when `CUDA.jl` or `MPI.jl` is imported. There are two reasons
+(`ext/ClimaCommsCUDAExt.jl`, `ext/ClimaCommsMetalExt.jl`, and
+`ext/ClimaCommsMPIExt.jl`) that Julia loads automatically when `CUDA.jl`,
+`Metal.jl`, or `MPI.jl` is imported. There are two reasons
 for this design:
 
 - optional heavyweight packages such as `CUDA.jl` and `MPI.jl` should not
@@ -74,9 +75,9 @@ for this design:
 
 The cost of this design is that someone has to import the backend package.
 Since driver scripts should not hard-code backends, `ClimaComms` provides
-[`ClimaComms.@import_required_backends`](@ref), which imports `MPI.jl`
-and/or `CUDA.jl` exactly when the environment variables request them. If a
-required backend is missing, [`ClimaComms.device`](@ref) and
+[`ClimaComms.@import_required_backends`](@ref), which imports `MPI.jl`,
+`CUDA.jl`, or `Metal.jl` exactly when the environment variables request them.
+If a required backend is missing, [`ClimaComms.device`](@ref) and
 [`ClimaComms.context`](@ref) fail with an actionable error message.
 
 !!! warning

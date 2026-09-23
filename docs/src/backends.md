@@ -55,4 +55,7 @@ They are built on six functions, which the extension defines for the device type
 - [`thread_index_in_kernel`](@ref ClimaComms.thread_index_in_kernel)`(device)` and
   [`threads_in_kernel`](@ref ClimaComms.threads_in_kernel)`(device)`, which are called from device code.
 
-The CUDA extension, `ext/ClimaCommsCUDAExt.jl`, defines every method on this page for `CUDADevice`.
+`compile_kernel` can return any object that the other functions accept.
+The Metal extension keeps `f` with the compiled kernel and passes it as the argument of each launch, because Metal.jl makes the arrays that `f` captures accessible to the GPU only when `f` is a launch argument.
+
+The CUDA extension, `ext/ClimaCommsCUDAExt.jl`, defines the methods of the section "Methods in the extension" and the six functions for `CUDADevice`, and the Metal extension, `ext/ClimaCommsMetalExt.jl`, for `MetalDevice`.

@@ -13,8 +13,10 @@ ClimaComms
 ```@docs
 ClimaComms.@import_required_backends
 ClimaComms.cuda_is_required
+ClimaComms.metal_is_required
 ClimaComms.mpi_is_required
 ClimaComms.cuda_ext_is_loaded
+ClimaComms.metal_ext_is_loaded
 ClimaComms.mpi_ext_is_loaded
 ```
 
@@ -27,6 +29,7 @@ ClimaComms.AbstractGPUDevice
 ClimaComms.CPUSingleThreaded
 ClimaComms.CPUMultiThreaded
 ClimaComms.CUDADevice
+ClimaComms.MetalDevice
 ClimaComms.device
 ClimaComms.device_functional
 ClimaComms.array_type

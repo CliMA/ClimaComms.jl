@@ -7,9 +7,9 @@
 `ClimaComms.jl` provides the abstractions for computing devices and
 communication contexts that the [CliMA Earth System
 Model](https://clima.caltech.edu) is built on. It lets the same simulation code
-run unchanged on a single CPU thread, on multiple CPU threads, on NVIDIA GPUs,
-and across many nodes with MPI — the device and the parallelism are selected at
-runtime, typically through environment variables.
+run unchanged on a single CPU thread, on multiple CPU threads, on NVIDIA and
+Apple GPUs, and across many nodes with MPI: the device and the parallelism are
+selected at runtime, typically through environment variables.
 
 |||
 |------------------:|:------------------------------------------------------------|
@@ -55,6 +55,7 @@ dependencies):
 
 ```julia
 Pkg.add("CUDA")   # for NVIDIA GPUs
+Pkg.add("Metal")  # for Apple GPUs (Float32 only)
 Pkg.add("MPI")    # for distributed runs
 ```
 
@@ -68,7 +69,7 @@ communicate). Both are selected at runtime from the `CLIMACOMMS_DEVICE` and
 ```julia
 import ClimaComms
 
-# Load MPI.jl and/or CUDA.jl if the environment variables request them.
+# Load MPI.jl, CUDA.jl, or Metal.jl, as the environment variables request.
 ClimaComms.@import_required_backends
 
 context = ClimaComms.context()          # e.g., SingletonCommsContext or MPICommsContext
@@ -89,6 +90,7 @@ To run the same script on a GPU, or on four MPI processes:
 
 ```bash
 CLIMACOMMS_DEVICE=CUDA julia script.jl
+CLIMACOMMS_DEVICE=Metal julia script.jl
 CLIMACOMMS_CONTEXT=MPI mpiexec -n 4 julia script.jl
 ```
 
@@ -108,8 +110,9 @@ end
 
 ## Key Features
 
-- **Device abstraction**: `CPUSingleThreaded`, `CPUMultiThreaded`, and
-  `CUDADevice` types select hardware-specific implementations via dispatch.
+- **Device abstraction**: `CPUSingleThreaded`, `CPUMultiThreaded`,
+  `CUDADevice`, and `MetalDevice` types select hardware-specific
+  implementations via dispatch.
 - **Context abstraction**: `SingletonCommsContext` and `MPICommsContext`
   provide a unified interface (`reduce`, `gather`, `bcast`, `barrier`, ...) for
   single-process and distributed runs.
@@ -118,8 +121,9 @@ end
   without code changes.
 - **Zero-cost fallbacks**: communication primitives are no-ops in
   single-process runs, and single-threaded loops compile to plain `for` loops.
-- **Optional backends**: `CUDA.jl` and `MPI.jl` are weak dependencies, loaded
-  through package extensions only when needed, which keeps load times low.
+- **Optional backends**: `CUDA.jl`, `Metal.jl`, and `MPI.jl` are weak
+  dependencies, loaded through package extensions only when needed, which keeps
+  load times low.
 - **Distributed logging**: loggers that silence non-root processes, prefix
   messages with MPI ranks, or write per-rank log files.
 
@@ -144,9 +148,9 @@ serial debugging on a laptop to multi-GPU production runs on a cluster.
 
 Backend-specific code lives in package extensions (`ext/`), so `ClimaComms`
 itself depends only on Julia's standard logging packages and `Adapt.jl`. Users
-opt into GPU or MPI support by installing and loading `CUDA.jl` or `MPI.jl`;
-the `ClimaComms.@import_required_backends` macro automates this based on the
-requested configuration.
+opt into GPU or MPI support by installing and loading `CUDA.jl`, `Metal.jl`, or
+`MPI.jl`; the `ClimaComms.@import_required_backends` macro automates this based
+on the requested configuration.
 
 ## Documentation
 
