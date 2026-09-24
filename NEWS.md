@@ -4,8 +4,11 @@ ClimaComms.jl Release Notes
 main
 -------
 
-- `@threaded` on a `MetalDevice` with the default `block_size` launches at least 16 threadgroups for each GPU core if the loop has enough iterations [PR 153](https://github.com/CliMA/ClimaComms.jl/pull/153).
+v0.6.13
+-------
+
 - Added `MetalDevice`, an experimental device for an Apple GPU without `Float64` support, which `CLIMACOMMS_DEVICE=Metal` selects and the extension `ClimaCommsMetalExt` implements with Metal.jl 1.11 or later [PR 153](https://github.com/CliMA/ClimaComms.jl/pull/153).
+- `@threaded` on a `MetalDevice` with the default `block_size` launches at least 16 threadgroups for each GPU core if the loop has enough iterations [PR 153](https://github.com/CliMA/ClimaComms.jl/pull/153).
 - Added `AbstractGPUDevice`, the supertype of `CUDADevice`, for which the GPU methods of `@threaded` are defined in terms of six functions that each GPU backend extension defines: `compile_kernel`, `launch_kernel`, `max_blocks_in_kernel`, `max_threads_in_block`, `thread_index_in_kernel`, and `threads_in_kernel` [PR 152](https://github.com/CliMA/ClimaComms.jl/pull/152).
 - Added `supports_float64(device)`, which returns whether the device supports `Float64` [PR 152](https://github.com/CliMA/ClimaComms.jl/pull/152).
 - `@threaded` with an integer `coarsen` on a `CUDADevice` no longer skips iterations in a kernel of `2^31` or more threads, because the stride of the loop is computed in `Int` [PR 152](https://github.com/CliMA/ClimaComms.jl/pull/152).
