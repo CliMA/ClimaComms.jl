@@ -294,7 +294,7 @@ end
 
 If the CPU version of the above example does not leverage
 spawned tasks (which require using `Base.sync` or `Threads.wait`
-to synchronize), then you may want to simply use [`cuda_sync`](@ref).
+to synchronize), then you may want to simply use [`device_sync`](@ref).
 """
 function sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
     Base.@sync begin
@@ -303,10 +303,10 @@ function sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
 end
 
 """
-    ClimaComms.cuda_sync(f, device, args...; kwargs...)
+    ClimaComms.device_sync(f, device, args...; kwargs...)
 
 Device-flexible version of `CUDA.@sync`; functional form of
-[`@cuda_sync`](@ref).
+[`@device_sync`](@ref).
 
 Calls
 ```julia
@@ -318,8 +318,21 @@ CUDA.@sync f(args...; kwargs...)
 ```
 for CUDA devices.
 """
-function cuda_sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
+function device_sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
     f(args...; kwargs...)
+end
+
+"""
+    ClimaComms.cuda_sync(f, device, args...; kwargs...)
+
+Deprecated; use [`device_sync`](@ref).
+"""
+function cuda_sync(f::F, device::AbstractDevice, args...; kwargs...) where {F}
+    Base.depwarn(
+        "`ClimaComms.cuda_sync` is deprecated, use `ClimaComms.device_sync` instead.",
+        :cuda_sync,
+    )
+    return device_sync(f, device, args...; kwargs...)
 end
 
 """
@@ -402,7 +415,7 @@ end
 
 If the CPU version of the above example does not leverage
 spawned tasks (which require using `Base.sync` or `Threads.wait`
-to synchronize), then you may want to simply use [`@cuda_sync`](@ref).
+to synchronize), then you may want to simply use [`@device_sync`](@ref).
 """
 macro sync(device, expr)
     __CC__ = ClimaComms
@@ -410,7 +423,7 @@ macro sync(device, expr)
 end
 
 """
-    @cuda_sync device expr
+    @device_sync device expr
 
 Device-flexible `CUDA.@sync`.
 
@@ -424,9 +437,23 @@ CUDA.@sync expr
 ```
 for CUDA devices.
 """
-macro cuda_sync(device, expr)
+macro device_sync(device, expr)
     __CC__ = ClimaComms
-    return :($__CC__.cuda_sync(() -> $(esc(expr)), $(esc(device))))
+    return :($__CC__.device_sync(() -> $(esc(expr)), $(esc(device))))
+end
+
+"""
+    @cuda_sync device expr
+
+Deprecated; use [`@device_sync`](@ref).
+"""
+macro cuda_sync(device, expr)
+    Base.depwarn(
+        "`ClimaComms.@cuda_sync` is deprecated, use `ClimaComms.@device_sync` instead.",
+        Symbol("@cuda_sync"),
+    )
+    __CC__ = ClimaComms
+    return :($__CC__.device_sync(() -> $(esc(expr)), $(esc(device))))
 end
 
 """
@@ -518,7 +545,7 @@ manually, with the following device-dependent behavior:
 
  - When `device` is an `AbstractGPUDevice`, the loop is compiled into a GPU
    kernel and launched without waiting for it to finish; use
-   [`@cuda_sync`](@ref) to wait for it. Because the iterations of each thread
+   [`@device_sync`](@ref) to wait for it. Because the iterations of each thread
    are fixed before the kernel is launched, only static scheduling can be used.
    Setting `coarsen` to any symbol causes each thread to evaluate a single
    iteration (default), and setting it to an integer value causes each thread to

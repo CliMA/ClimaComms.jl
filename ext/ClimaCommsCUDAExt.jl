@@ -50,7 +50,7 @@ ClimaComms.allowscalar(f, ::CUDADevice, args...; kwargs...) =
 # so they call these functions.
 ClimaComms.sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@sync f(args...; kwargs...)
-ClimaComms.cuda_sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =
+ClimaComms.device_sync(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@sync f(args...; kwargs...)
 ClimaComms.time(f::F, ::CUDADevice, args...; kwargs...) where {F} =
     CUDA.@time f(args...; kwargs...)

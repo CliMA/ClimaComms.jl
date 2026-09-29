@@ -44,10 +44,12 @@ ClimaComms.@time
 ClimaComms.@elapsed
 ClimaComms.@assert
 ClimaComms.@sync
+ClimaComms.@device_sync
 ClimaComms.@cuda_sync
 ClimaComms.time
 ClimaComms.elapsed
 ClimaComms.sync
+ClimaComms.device_sync
 ClimaComms.cuda_sync
 ClimaComms.allowscalar
 ```

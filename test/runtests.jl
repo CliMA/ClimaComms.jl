@@ -223,6 +223,13 @@ include("device_interface.jl")
     @test ClimaComms.CUDADevice() isa ClimaComms.AbstractGPUDevice
     @test !(ClimaComms.CPUSingleThreaded() isa ClimaComms.AbstractGPUDevice)
     test_device_interface(device)
+    a = ClimaComms.array_type(device)(zeros(Float32, 3))
+    @test (@test_deprecated ClimaComms.cuda_sync(fill!, device, a, 2)) ==
+          ClimaComms.array_type(device)(fill(2.0f0, 3))
+    @test_deprecated macroexpand(
+        @__MODULE__,
+        :(ClimaComms.@cuda_sync $device nothing),
+    )
 end
 
 @testset "context interface" begin

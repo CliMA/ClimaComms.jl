@@ -20,7 +20,7 @@ function test_device_interface(device)
 
     a = AT(zeros(FT, 3))
     @test ClimaComms.allowscalar(getindex, device, a, 1) == 0
-    @test ClimaComms.cuda_sync(fill!, device, a, 1) == AT(ones(FT, 3))
+    @test ClimaComms.device_sync(fill!, device, a, 1) == AT(ones(FT, 3))
     @test ClimaComms.sync(fill!, device, a, 2) == AT(fill(FT(2), 3))
     @test ClimaComms.elapsed(fill!, device, a, 3) >= 0
     @test ClimaComms.time(fill!, device, a, 4) == AT(fill(FT(4), 3))
@@ -34,7 +34,7 @@ function test_device_interface(device)
     # A failed assertion in a kernel makes a CUDA context unusable until the
     # process exits.
     device isa ClimaComms.CUDADevice ||
-        @test_throws Exception ClimaComms.@cuda_sync device double!(a, false)
+        @test_throws Exception ClimaComms.@device_sync device double!(a, false)
 
     device isa ClimaComms.AbstractGPUDevice || return nothing
     @test Adapt.adapt(AT, ClimaComms.CPUSingleThreaded()) == device
