@@ -256,6 +256,44 @@ if device isa ClimaComms.MetalDevice
         ClimaComms.device_synchronize(device)
         @test count(==(1), unsafe_wrap(Array, a)) == 65536
     end
+
+    @testset "threadgroups of @threaded" begin
+        function write_launch_shape!(groups, simd_widths)
+            ClimaComms.@threaded device for i in axes(groups, 1)
+                groups[i] = Metal.threadgroups_per_grid().x
+                simd_widths[i] = Metal.threads_per_simdgroup()
+            end
+        end
+        # A loop launches at least as many threadgroups as GPU cores, or one
+        # threadgroup for each SIMD group of items if there are fewer.
+        for n_items in (1024, 65536, 2^20)
+            groups = AT{Int32}(undef, n_items)
+            simd_widths = AT{Int32}(undef, n_items)
+            write_launch_shape!(groups, simd_widths)
+            groups, simd_widths = Array(groups), Array(simd_widths)
+            @test allequal(groups) && allequal(simd_widths)
+            @test first(groups) >=
+                  min(Metal.num_gpu_cores(), fld(n_items, first(simd_widths)))
+        end
+
+        # A block size above the largest threadgroup of the kernel is decreased
+        # to that size.
+        a = AT{Int32}(undef, 2^16)
+        write_first_thread!() =
+            (a[1] = Metal.threads_per_threadgroup().x; nothing)
+        kernel = ClimaComms.compile_kernel(device, write_first_thread!)
+        max_threads = kernel.kernel.maxthreads
+        @test ClimaComms.max_threads_in_block(device, kernel, 2^20, 2^16) ==
+              max_threads
+        write_threads!(a) = ClimaComms.@threaded device block_size = 2^20 begin
+            for i in axes(a, 1)
+                a[i] = Metal.threads_per_threadgroup().x
+            end
+        end
+        write_threads!(a)
+        threads = Array(a)
+        @test allequal(threads) && first(threads) == max_threads
+    end
 end
 
 @testset "context interface" begin

@@ -4,6 +4,8 @@ ClimaComms.jl Release Notes
 main
 -------
 
+- `@threaded` on a `MetalDevice` with the default `block_size` sets the threads in each threadgroup to the largest multiple of the SIMD width that is at most the number of threads of the loop divided by 16 times the number of GPU cores, so that the loop launches at least 16 threadgroups for each core, from one SIMD group to the largest threadgroup of the kernel [PR 153](https://github.com/CliMA/ClimaComms.jl/pull/153).
+- `@threaded` on a `MetalDevice` decreases an integer `block_size` above the largest threadgroup of the kernel to that size [PR 153](https://github.com/CliMA/ClimaComms.jl/pull/153).
 - Added `MetalDevice`, an Apple GPU without `Float64` support, which `CLIMACOMMS_DEVICE=Metal` selects and the extension `ClimaCommsMetalExt` implements with Metal.jl 1.11 or later [PR 153](https://github.com/CliMA/ClimaComms.jl/pull/153).
 - Added `AbstractGPUDevice`, the supertype of `CUDADevice`, for which the GPU methods of `@threaded` are defined in terms of six functions that each GPU backend extension defines: `compile_kernel`, `launch_kernel`, `max_blocks_in_kernel`, `max_threads_in_block`, `thread_index_in_kernel`, and `threads_in_kernel` [PR 152](https://github.com/CliMA/ClimaComms.jl/pull/152).
 - Added `supports_float64(device)`, which returns whether the device supports `Float64` [PR 152](https://github.com/CliMA/ClimaComms.jl/pull/152).

@@ -63,14 +63,29 @@ ClimaComms.launch_kernel(
 # Metal allows at most typemax(UInt32) threads in each dimension of a grid.
 ClimaComms.max_blocks_in_kernel(::MetalDevice, (; kernel)::ClosureKernel) =
     fld(Int(typemax(UInt32)), kernel.maxthreads)
-ClimaComms.max_threads_in_block(::MetalDevice, _, block_size::Int, _) =
-    block_size
 ClimaComms.max_threads_in_block(
     ::MetalDevice,
     (; kernel)::ClosureKernel,
-    ::Val{:auto},
+    block_size::Int,
     _,
-) = kernel.maxthreads
+) = min(block_size, kernel.maxthreads)
+# With the default block size, the number of threads in each threadgroup is the
+# largest multiple of the SIMD width that is at most the number of threads of
+# the loop divided by GROUPS_PER_CORE times the number of GPU cores, from one
+# SIMD group to the largest threadgroup of the kernel. Metal.jl returns 0 cores for a device that
+# does not report them.
+const GROUPS_PER_CORE = 16
+function ClimaComms.max_threads_in_block(
+    ::MetalDevice,
+    (; kernel)::ClosureKernel,
+    ::Val{:auto},
+    n_threads,
+)
+    simd_width = kernel.exec_width
+    n_groups = GROUPS_PER_CORE * max(Metal.num_gpu_cores(), 1)
+    threads = simd_width * max(fld(fld(n_threads, n_groups), simd_width), 1)
+    return min(threads, kernel.maxthreads)
+end
 ClimaComms.thread_index_in_kernel(::MetalDevice) =
     Int(Metal.thread_position_in_grid().x)
 ClimaComms.threads_in_kernel(::MetalDevice) = Int(Metal.threads_per_grid().x)
