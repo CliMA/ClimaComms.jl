@@ -42,13 +42,13 @@ function test_macro_hyhiene(dev)
         sin.(AT(rand(10)))
     end
 
-    CC.cuda_sync(dev) do
+    CC.device_sync(dev) do
         for i in 1:n
             sin.(AT(rand(10)))
         end
     end
 
-    CC.@cuda_sync dev for i in 1:n
+    CC.@device_sync dev for i in 1:n
         sin.(AT(rand(10)))
     end
 end

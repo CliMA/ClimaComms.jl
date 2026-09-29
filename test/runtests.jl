@@ -223,6 +223,17 @@ include("device_interface.jl")
     @test ClimaComms.CUDADevice() isa ClimaComms.AbstractGPUDevice
     @test !(ClimaComms.CPUSingleThreaded() isa ClimaComms.AbstractGPUDevice)
     test_device_interface(device)
+    a = ClimaComms.array_type(device)(zeros(Float32, 3))
+    message =
+        r"`ClimaComms.cuda_sync` and `ClimaComms.@cuda_sync` are deprecated"
+    x = @test_deprecated message ClimaComms.cuda_sync(fill!, device, a, 2)
+    @test x == ClimaComms.array_type(device)(fill(2.0f0, 3))
+    @test_logs macroexpand(
+        @__MODULE__,
+        :(ClimaComms.@cuda_sync $device nothing),
+    )
+    x = @test_deprecated message ClimaComms.@cuda_sync device fill!(a, 3)
+    @test x == ClimaComms.array_type(device)(fill(3.0f0, 3))
 end
 
 @testset "context interface" begin

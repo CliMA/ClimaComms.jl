@@ -109,7 +109,7 @@ dt = ClimaComms.@elapsed device my_kernel!(x) # @elapsed / CUDA.@elapsed
 ClimaComms.@sync device my_kernel!(x)         # @sync / CUDA.@sync
 ```
 
-Use [`ClimaComms.@cuda_sync`](@ref) when you only need to synchronize GPU
+Use [`ClimaComms.@device_sync`](@ref) when you only need to synchronize GPU
 work (it is a no-op on CPUs, avoiding the overhead of `Base.@sync`).
 
 ## How to print or log only from the root process

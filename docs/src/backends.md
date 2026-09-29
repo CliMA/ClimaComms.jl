@@ -30,7 +30,7 @@ The extension, `ext/ClimaComms<Backend>Ext.jl`, defines these methods for the de
 | `free_memory(device)`, `total_memory(device)` | the bytes of memory that are available for allocation now and in total  |
 | `device_synchronize(device)`                  | waits for all work queued on the device                                 |
 | `allowscalar(f, device, args...; kwargs...)`  | `f(args...; kwargs...)`, with scalar indexing of device arrays allowed  |
-| `time`, `elapsed`, `sync`, `cuda_sync`        | the functional forms of `@time`, `@elapsed`, `@sync`, and `@cuda_sync`  |
+| `time`, `elapsed`, `sync`, `device_sync`      | the functional forms of `@time`, `@elapsed`, `@sync`, and `@device_sync` |
 | `assert(device, cond, text)`                  | the functional form of `@assert`                                        |
 | `Adapt.adapt_structure(::Type{<:A}, ::AbstractDevice)`, where `A` is the array type     |         the device            |
 
