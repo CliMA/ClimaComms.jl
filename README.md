@@ -25,8 +25,8 @@ runtime, typically through environment variables.
 [docs-dev-img]: https://img.shields.io/badge/docs-dev-blue.svg
 [docs-dev-url]: https://CliMA.github.io/ClimaComms.jl/dev/
 
-[version-img]: https://juliahub.com/docs/General/ClimaComms/stable/version.svg
-[version-url]: https://juliahub.com/ui/Packages/General/ClimaComms
+[version-img]: https://img.shields.io/github/v/release/CliMA/ClimaComms.jl
+[version-url]: https://github.com/CliMA/ClimaComms.jl/releases
 
 [license-img]: https://img.shields.io/badge/license-Apache%202.0-blue.svg
 [license-url]: https://github.com/CliMA/ClimaComms.jl/blob/main/LICENSE
