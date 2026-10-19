@@ -218,6 +218,20 @@ end
           AT(fill(Float64(1), 3))
 end
 
+include("device_interface.jl")
+@testset "device interface" begin
+    @test ClimaComms.CUDADevice() isa ClimaComms.AbstractGPUDevice
+    @test !(ClimaComms.CPUSingleThreaded() isa ClimaComms.AbstractGPUDevice)
+    test_device_interface(device)
+    a = ClimaComms.array_type(device)(zeros(Float32, 3))
+    @test (@test_deprecated ClimaComms.cuda_sync(fill!, device, a, 2)) ==
+          ClimaComms.array_type(device)(fill(2.0f0, 3))
+    @test_deprecated macroexpand(
+        @__MODULE__,
+        :(ClimaComms.@cuda_sync $device nothing),
+    )
+end
+
 @testset "context interface" begin
     # Every context operation must have a method for every context type,
     # including operations that are rarely exercised (issue: `abort` was
@@ -280,7 +294,7 @@ end
     ClimaComms.allowscalar(device) do
         x = a[1]
     end
-    device isa ClimaComms.CUDADevice && @test_throws ErrorException a[1]
+    device isa ClimaComms.AbstractGPUDevice && @test_throws ErrorException a[1]
     @test x == Array(a)[1]
 end
 

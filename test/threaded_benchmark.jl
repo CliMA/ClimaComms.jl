@@ -42,27 +42,27 @@ end
 @info "Benchmarking n-th derivative along first axis of a $x_max×$y_max matrix"
 
 identity_copy_reference!(∂ⁿa∂xⁿ, a, device) =
-    ClimaComms.@cuda_sync device ∂ⁿa∂xⁿ .= a
+    ClimaComms.@device_sync device ∂ⁿa∂xⁿ .= a
 ident_first_time = @elapsed identity_copy_reference!(∂ⁿa∂xⁿ, a, device)
 ident_time = @elapsed identity_copy_reference!(∂ⁿa∂xⁿ, a, device)
 @info "reference identity copy, n = 0:"
 @info "    Latency = $(round(ident_first_time - ident_time; sigdigits = 3)) s"
 print_time_and_bandwidth(device, 2 * sizeof(a), ident_time)
 
-identity_copy!(∂ⁿa∂xⁿ, a, device) = ClimaComms.@cuda_sync device begin
+identity_copy!(∂ⁿa∂xⁿ, a, device) = ClimaComms.@device_sync device begin
     ClimaComms.@threaded device for y in axes(a, 2), x in axes(a, 1)
         @inbounds ∂ⁿa∂xⁿ[x, y] = a[x, y]
     end
 end
-ident_first_time = @elapsed identity_copy_reference!(∂ⁿa∂xⁿ, a, device)
-ident_time = @elapsed identity_copy_reference!(∂ⁿa∂xⁿ, a, device)
+ident_first_time = @elapsed identity_copy!(∂ⁿa∂xⁿ, a, device)
+ident_time = @elapsed identity_copy!(∂ⁿa∂xⁿ, a, device)
 @info "@threaded identity copy, n = 0:"
 @info "    Latency = $(round(ident_first_time - ident_time; sigdigits = 3)) s"
 print_time_and_bandwidth(device, 2 * sizeof(a), ident_time)
 
 xy_pairs = AT(CartesianIndices(a))
 nth_deriv_by_col_reference!(∂ⁿa∂xⁿ, a, device, n, xy_pairs) =
-    ClimaComms.@cuda_sync device begin
+    ClimaComms.@device_sync device begin
         ∂ⁿa∂xⁿ .=
             (pair -> nth_deriv_along_axis1(a, n, pair[1], pair[2])).(xy_pairs)
     end
@@ -77,7 +77,7 @@ for n in (0, 2, 6)
     print_time_and_bandwidth(device, 2 * sizeof(a), time)
 end
 
-nth_deriv_by_col!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@cuda_sync device begin
+nth_deriv_by_col!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@device_sync device begin
     ClimaComms.@threaded device for y in axes(a, 2), x in axes(a, 1)
         @inbounds ∂ⁿa∂xⁿ[x, y] = nth_deriv_along_axis1(a, n, x, y)
     end
@@ -95,7 +95,7 @@ end
 # The following shared memory kernels will be benchmarked in PR #113.
 #=
 nth_deriv_by_col_shmem_1!(∂ⁿa∂xⁿ, a, device, n, ::Val{x_max}) where {x_max} =
-    ClimaComms.@cuda_sync device begin
+    ClimaComms.@device_sync device begin
         ClimaComms.@threaded device begin
             for y in axes(a, 2), x in @interdependent(axes(a, 1))
                 T = eltype(a)
@@ -110,7 +110,7 @@ nth_deriv_by_col_shmem_1!(∂ⁿa∂xⁿ, a, device, n, ::Val{x_max}) where {x_m
     end
 
 nth_deriv_by_col_shmem_2!(∂ⁿa∂xⁿ, a, device, n, ::Val{x_max}) where {x_max} =
-    ClimaComms.@cuda_sync device begin
+    ClimaComms.@device_sync device begin
         ClimaComms.@threaded device begin
             for y in axes(a, 2), x in @interdependent(axes(a, 1))
                 T = eltype(a)
