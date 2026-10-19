@@ -3,9 +3,9 @@
 `ClimaComms.jl` provides the abstractions for computing devices and
 communication contexts on which the [CliMA](https://github.com/CliMA)
 ecosystem is built. It lets the same simulation code run unchanged on a
-single CPU thread, on multiple CPU threads, on NVIDIA GPUs, and across many
-nodes with MPI: the device and the parallelism are selected at runtime,
-typically through environment variables.
+single CPU thread, on multiple CPU threads, on NVIDIA and Apple GPUs, and
+across many nodes with MPI: the device and the parallelism are selected at
+runtime, typically through environment variables.
 
 ## The two central abstractions
 
@@ -14,7 +14,8 @@ that executes code. The devices currently implemented are
 
 - [`CPUSingleThreaded`](@ref ClimaComms.CPUSingleThreaded): a CPU using a single thread,
 - [`CPUMultiThreaded`](@ref ClimaComms.CPUMultiThreaded): a CPU using multiple threads,
-- [`CUDADevice`](@ref ClimaComms.CUDADevice): a single CUDA-enabled GPU.
+- [`CUDADevice`](@ref ClimaComms.CUDADevice): a single CUDA-enabled GPU,
+- [`MetalDevice`](@ref ClimaComms.MetalDevice): a single Apple GPU, which does not support `Float64`.
 
 A **context** ([`ClimaComms.AbstractCommsContext`](@ref)) is the environment
 through which processes communicate. It wraps a device and, for distributed

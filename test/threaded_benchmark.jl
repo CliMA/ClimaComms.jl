@@ -9,7 +9,8 @@ AT = ClimaComms.array_type(device)
 
 x_max = 100
 y_max = device isa ClimaComms.CUDADevice ? 1000000 : 10000
-a = AT(rand(x_max, y_max))
+FT = ClimaComms.supports_float64(device) ? Float64 : Float32
+a = AT(rand(FT, x_max, y_max))
 ∂ⁿa∂xⁿ = similar(a)
 
 Base.@propagate_inbounds function nth_deriv_along_axis1(array, n, i, indices...)
@@ -66,7 +67,10 @@ nth_deriv_by_col_reference!(∂ⁿa∂xⁿ, a, device, n, xy_pairs) =
         ∂ⁿa∂xⁿ .=
             (pair -> nth_deriv_along_axis1(a, n, pair[1], pair[2])).(xy_pairs)
     end
-for n in (0, 2, 6)
+# Kernels that recurse more than one level deep fault on an Apple GPU, so on
+# Metal the recursive derivative is only benchmarked with n = 0.
+ns = device isa ClimaComms.MetalDevice ? (0,) : (0, 2, 6)
+for n in ns
     if n == 0
         first_time =
             @elapsed nth_deriv_by_col_reference!(∂ⁿa∂xⁿ, a, device, n, xy_pairs)
@@ -82,7 +86,7 @@ nth_deriv_by_col!(∂ⁿa∂xⁿ, a, device, n) = ClimaComms.@device_sync device
         @inbounds ∂ⁿa∂xⁿ[x, y] = nth_deriv_along_axis1(a, n, x, y)
     end
 end
-for n in (0, 2, 6)
+for n in ns
     if n == 0
         first_time = @elapsed nth_deriv_by_col!(∂ⁿa∂xⁿ, a, device, n)
     end

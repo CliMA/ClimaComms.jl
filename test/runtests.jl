@@ -6,6 +6,8 @@ context = ClimaComms.context()
 pid, nprocs = ClimaComms.init(context)
 device = ClimaComms.device(context)
 AT = ClimaComms.array_type(device)
+FTs = ClimaComms.supports_float64(device) ? (Float32, Float64) : (Float32,)
+FT = last(FTs)
 
 if ClimaComms.iamroot(context)
     @info "Running test" context device AT
@@ -20,6 +22,8 @@ if haskey(ENV, "CLIMACOMMS_TEST_DEVICE")
         @test device isa ClimaComms.CPUMultiThreaded
     elseif ENV["CLIMACOMMS_TEST_DEVICE"] == "CUDA"
         @test device isa ClimaComms.CUDADevice
+    elseif ENV["CLIMACOMMS_TEST_DEVICE"] == "Metal"
+        @test device isa ClimaComms.MetalDevice
     end
 end
 
@@ -34,7 +38,7 @@ else
     graph_opt_list = [()]
 end
 @testset "tree test $graph_opt" for graph_opt in graph_opt_list
-    for FT in (Float32, Float64)
+    for FT in FTs
         # every process communicates with the root
         if ClimaComms.iamroot(context)
             # send 2*n items to the nth pid, receive 3*n
@@ -100,7 +104,7 @@ end
 end
 
 @testset "linear test $graph_opt" for graph_opt in graph_opt_list
-    for FT in (Float32, Float64)
+    for FT in FTs
         # send 2 values up
         if pid < nprocs
             sendpids = Int[pid + 1]
@@ -159,7 +163,7 @@ end
 end
 
 @testset "gather" begin
-    for FT in (Float32, Float64)
+    for FT in FTs
         local_array = AT(fill(FT(pid), (3, pid)))
         gathered = ClimaComms.gather(context, local_array)
         if ClimaComms.iamroot(context)
@@ -173,7 +177,7 @@ end
 end
 
 @testset "reduce/reduce!/allreduce" begin
-    for FT in (Float32, Float64)
+    for FT in FTs
         pidsum = div(nprocs * (nprocs + 1), 2)
 
         sendrecvbuf = AT(fill(FT(pid), 3))
@@ -214,14 +218,18 @@ end
     @test ClimaComms.bcast(context, "root pid is $pid") == "root pid is 1"
     @test ClimaComms.bcast(context, AT(fill(Float32(pid), 3))) ==
           AT(fill(Float32(1), 3))
-    @test ClimaComms.bcast(context, AT(fill(Float64(pid), 3))) ==
-          AT(fill(Float64(1), 3))
+    if Float64 in FTs
+        @test ClimaComms.bcast(context, AT(fill(Float64(pid), 3))) ==
+              AT(fill(Float64(1), 3))
+    end
 end
 
 include("device_interface.jl")
 @testset "device interface" begin
     @test ClimaComms.CUDADevice() isa ClimaComms.AbstractGPUDevice
+    @test ClimaComms.MetalDevice() isa ClimaComms.AbstractGPUDevice
     @test !(ClimaComms.CPUSingleThreaded() isa ClimaComms.AbstractGPUDevice)
+    @test !ClimaComms.supports_float64(ClimaComms.MetalDevice())
     test_device_interface(device)
     a = ClimaComms.array_type(device)(zeros(Float32, 3))
     @test (@test_deprecated ClimaComms.cuda_sync(fill!, device, a, 2)) ==
@@ -230,6 +238,62 @@ include("device_interface.jl")
         @__MODULE__,
         :(ClimaComms.@cuda_sync $device nothing),
     )
+end
+
+if device isa ClimaComms.MetalDevice
+    @testset "device_synchronize with a kernel from another task" begin
+        function slow_fill!(a, value, device)
+            ClimaComms.@threaded device for i in axes(a, 1)
+                x = zero(value)
+                for _ in 1:2_000_000
+                    x = muladd(x, 0.999999f0, 1.0f-7)
+                end
+                a[i] = value + 0 * x
+            end
+        end
+        a = Metal.MtlArray{Float32, 1, Metal.SharedStorage}(undef, 65536)
+        wait(Threads.@spawn slow_fill!(a, 1.0f0, device))
+        ClimaComms.device_synchronize(device)
+        @test count(==(1), unsafe_wrap(Array, a)) == 65536
+    end
+
+    @testset "threadgroups of @threaded" begin
+        function write_launch_shape!(groups, simd_widths)
+            ClimaComms.@threaded device for i in axes(groups, 1)
+                groups[i] = Metal.threadgroups_per_grid().x
+                simd_widths[i] = Metal.threads_per_simdgroup()
+            end
+        end
+        # A loop launches at least as many threadgroups as GPU cores, or one
+        # threadgroup for each SIMD group of items if there are fewer.
+        for n_items in (1024, 65536, 2^20)
+            groups = AT{Int32}(undef, n_items)
+            simd_widths = AT{Int32}(undef, n_items)
+            write_launch_shape!(groups, simd_widths)
+            groups, simd_widths = Array(groups), Array(simd_widths)
+            @test allequal(groups) && allequal(simd_widths)
+            @test first(groups) >=
+                  min(Metal.num_gpu_cores(), fld(n_items, first(simd_widths)))
+        end
+
+        # A block size above the largest threadgroup of the kernel is decreased
+        # to that size.
+        a = AT{Int32}(undef, 2^16)
+        write_first_thread!() =
+            (a[1] = Metal.threads_per_threadgroup().x; nothing)
+        kernel = ClimaComms.compile_kernel(device, write_first_thread!)
+        max_threads = kernel.kernel.maxthreads
+        @test ClimaComms.max_threads_in_block(device, kernel, 2^20, 2^16) ==
+              max_threads
+        write_threads!(a) = ClimaComms.@threaded device block_size = 2^20 begin
+            for i in axes(a, 1)
+                a[i] = Metal.threads_per_threadgroup().x
+            end
+        end
+        write_threads!(a)
+        threads = Array(a)
+        @test allequal(threads) && first(threads) == max_threads
+    end
 end
 
 @testset "context interface" begin
@@ -246,7 +310,7 @@ end
     # The MPI methods return newly allocated arrays, so the singleton
     # methods must not return the input buffer itself.
     sctx = ClimaComms.SingletonCommsContext(device)
-    buf = AT([1.0, 2.0, 3.0])
+    buf = AT(FT[1, 2, 3])
     @test ClimaComms.allreduce(sctx, buf, +) == buf
     @test ClimaComms.allreduce(sctx, buf, +) !== buf
     @test ClimaComms.reduce(sctx, buf, +) == buf
@@ -267,6 +331,14 @@ end
             sprint(showerror, e)
         end
         @test occursin("CUDA.jl is not loaded", msg)
+    end
+    if !ClimaComms.metal_ext_is_loaded()
+        msg = try
+            ClimaComms.array_type(ClimaComms.MetalDevice())
+        catch e
+            sprint(showerror, e)
+        end
+        @test occursin("Metal.jl is not loaded", msg)
     end
     if !ClimaComms.mpi_ext_is_loaded()
         msg = try
@@ -289,7 +361,7 @@ end
 end
 
 @testset "allowscalar" begin
-    a = AT(rand(3))
+    a = AT(rand(FT, 3))
     local x
     ClimaComms.allowscalar(device) do
         x = a[1]
@@ -299,8 +371,8 @@ end
 end
 
 @testset "threaded" begin
-    a = AT(rand(100))
-    b = AT(rand(100))
+    a = AT(rand(FT, 100))
+    b = AT(rand(FT, 100))
 
     kernel1!(a, b) = ClimaComms.@threaded for i in axes(a, 1)
         a[i] = b[i]
@@ -350,8 +422,8 @@ end
 end
 
 @testset "threaded with lazy iterators" begin
-    a = AT(rand(100))
-    b = AT(rand(100))
+    a = AT(rand(FT, 100))
+    b = AT(rand(FT, 100))
 
     kernel1!(a, b) = ClimaComms.@threaded device for (i, b_i) in enumerate(b)
         a[i] = b_i
@@ -416,9 +488,9 @@ end
 end
 
 @testset "threaded with multiple iterators" begin
-    a = AT(rand(100, 1000))
-    b1 = AT(rand(100))
-    b2 = AT(rand(1000))
+    a = AT(rand(FT, 100, 1000))
+    b1 = AT(rand(FT, 100))
+    b2 = AT(rand(FT, 1000))
 
     kernel1!(a, b1, b2) = ClimaComms.@threaded device begin
         for i in axes(a, 1), j in axes(a, 2)
@@ -462,6 +534,8 @@ import Adapt
 
     @test Adapt.adapt(Array, ClimaComms.context(ClimaComms.CUDADevice())) ==
           ClimaComms.context(ClimaComms.CPUSingleThreaded())
+    @test Adapt.adapt(Array, ClimaComms.MetalDevice()) ==
+          ClimaComms.CPUSingleThreaded()
     @static if ClimaComms.device() isa ClimaComms.CUDADevice
         @test Adapt.adapt(Array, ClimaComms.context(ClimaComms.CUDADevice())) ==
               ClimaComms.context(ClimaComms.CPUSingleThreaded())

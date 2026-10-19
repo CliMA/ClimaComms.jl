@@ -2,8 +2,9 @@
 
 ## How do I run my simulation on a GPU?
 
-Set the environment variable `CLIMACOMMS_DEVICE` to `CUDA`. This can be
-accomplished in your Julia script with (at the top)
+Set the environment variable `CLIMACOMMS_DEVICE` to `CUDA` for an NVIDIA GPU,
+or to `Metal` for an Apple GPU. This can be accomplished in your Julia script
+with (at the top)
 ```julia
 ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 ```
