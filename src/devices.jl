@@ -578,14 +578,17 @@ manually, with the following device-dependent behavior:
    coarsening is automatically increased.
 
    The optional argument `block_size` is also available for manually specifying
-   the size of each block on a GPU. The default value of `:auto` sets the number
-   of threads in each block to the largest possible value that permits a high
-   GPU "occupancy" (the number of active thread warps in each multiprocessor
-   executing the kernel). An integer can be used instead of `:auto` to override
-   this default value. If the specified value exceeds the total number of
-   threads, it is automatically decreased to avoid idle threads. If it exceeds
-   the number of threads in a block that the kernel allows, the launch throws an
-   error.
+   the size of each block on a GPU. With the default value of `:auto`, the
+   backend chooses the number of threads in each block: on a `CUDADevice`, the
+   largest value that permits a high GPU "occupancy" (the number of active
+   thread warps in each multiprocessor executing the kernel), and on a
+   `MetalDevice`, the largest multiple of the SIMD width for which the loop
+   launches at least a fixed number of blocks for each GPU core, if the loop
+   has enough iterations.
+   An integer can be used instead of `:auto` to override this default value.
+   If the specified value exceeds the total number of threads, it is
+   automatically decreased to avoid idle threads. If it exceeds the number of
+   threads in a block that the kernel allows, the launch throws an error.
 
 Any iterator with methods for `firstindex`, `length`, and `getindex` can be used
 in a `@threaded` loop. All lazy iterators from `Base` and `Base.Iterators`, such

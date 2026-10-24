@@ -260,6 +260,26 @@ if device isa ClimaComms.MetalDevice
         ClimaComms.device_synchronize(device)
         @test count(==(1), unsafe_wrap(Array, a)) == 65536
     end
+
+    @testset "threadgroups of @threaded" begin
+        function write_launch_shape!(groups, simd_widths)
+            ClimaComms.@threaded device for i in axes(groups, 1)
+                groups[i] = Metal.threadgroups_per_grid().x
+                simd_widths[i] = Metal.threads_per_simdgroup()
+            end
+        end
+        # A loop launches at least as many threadgroups as GPU cores, or one
+        # threadgroup for each SIMD group of items if there are fewer.
+        for n_items in (1024, 65536, 2^20)
+            groups = AT{Int32}(undef, n_items)
+            simd_widths = AT{Int32}(undef, n_items)
+            write_launch_shape!(groups, simd_widths)
+            groups, simd_widths = Array(groups), Array(simd_widths)
+            @test allequal(groups) && allequal(simd_widths)
+            @test first(groups) >=
+                  min(Metal.num_gpu_cores(), fld(n_items, first(simd_widths)))
+        end
+    end
 end
 
 @testset "context interface" begin
