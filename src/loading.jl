@@ -31,6 +31,15 @@ cuda_is_required() && using CUDA
 cuda_is_required() = device_type() == :CUDADevice
 
 """
+    ClimaComms.metal_is_required()
+
+Return `true` if `Metal.jl` needs to be loaded, based on the
+`CLIMACOMMS_DEVICE` environment variable. See [`device`](@ref) for more
+information.
+"""
+metal_is_required() = device_type() == :MetalDevice
+
+"""
     ClimaComms.cuda_ext_is_loaded()
 
 Return `true` if the `ClimaCommsCUDAExt` extension is loaded (i.e., if
@@ -49,12 +58,22 @@ mpi_ext_is_loaded() =
     !isnothing(Base.get_extension(ClimaComms, :ClimaCommsMPIExt))
 
 """
+    ClimaComms.metal_ext_is_loaded()
+
+Return `true` if the `ClimaCommsMetalExt` extension is loaded (i.e., if
+`Metal.jl` has been imported).
+"""
+metal_ext_is_loaded() =
+    !isnothing(Base.get_extension(ClimaComms, :ClimaCommsMetalExt))
+
+"""
     ClimaComms.@import_required_backends
 
 Import the backend packages required by the runtime configuration: if the
 `CLIMACOMMS_CONTEXT` environment variable requests MPI, import `MPI.jl`;
-if the `CLIMACOMMS_DEVICE` environment variable requests CUDA, import
-`CUDA.jl`. The packages must be available in the active Julia environment.
+if the `CLIMACOMMS_DEVICE` environment variable requests CUDA or Metal, import
+`CUDA.jl` or `Metal.jl`. The packages must be available in the active Julia
+environment.
 
 Add this macro to the top of driver scripts, after `import ClimaComms`, so
 that the same script works for any device and context.
@@ -82,6 +101,11 @@ macro import_required_backends()
             $assert_backend_available("CUDA", "CLIMACOMMS_DEVICE=\"CUDA\"")
             @debug "Loading CUDA via `import CUDA`..."
             import CUDA
+        end
+        @static if $metal_is_required()
+            $assert_backend_available("Metal", "CLIMACOMMS_DEVICE=\"Metal\"")
+            @debug "Loading Metal via `import Metal`..."
+            import Metal
         end
     end
 end

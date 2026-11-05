@@ -22,6 +22,12 @@ ENV["CLIMACOMMS_DEVICE"] = "CUDA"
 device is used; adding [`ClimaComms.@import_required_backends`](@ref) at
 the top of the script (after `import ClimaComms`) takes care of loading.
 
+To run on an Apple GPU, set `CLIMACOMMS_DEVICE` to `Metal` and install
+`Metal.jl`. Apple GPUs do not support `Float64`, and
+[`ClimaComms.supports_float64`](@ref) returns `false` for a `MetalDevice`.
+Support for `MetalDevice` is experimental: no continuous integration runs the
+tests on an Apple GPU.
+
 ## How to run a script with MPI
 
 Set `CLIMACOMMS_CONTEXT` to `MPI` and launch Julia with an MPI launcher:
@@ -99,7 +105,7 @@ type-inference requirements of GPU execution.
 
 GPU kernels launch asynchronously, so `Base.@time` measures only the launch
 cost. Use the device-flexible macros, which fall back to the `Base`
-versions on CPUs and use the `CUDA.jl` versions on GPUs:
+versions on CPUs and use the `CUDA.jl` or `Metal.jl` versions on GPUs:
 
 ```julia
 device = ClimaComms.device()
@@ -109,7 +115,7 @@ dt = ClimaComms.@elapsed device my_kernel!(x) # @elapsed / CUDA.@elapsed
 ClimaComms.@sync device my_kernel!(x)         # @sync / CUDA.@sync
 ```
 
-Use [`ClimaComms.@cuda_sync`](@ref) when you only need to synchronize GPU
+Use [`ClimaComms.@device_sync`](@ref) when you only need to synchronize GPU
 work (it is a no-op on CPUs, avoiding the overhead of `Base.@sync`).
 
 ## How to print or log only from the root process
@@ -134,7 +140,8 @@ and rank-prefixed messages ([`ClimaComms.MPILogger`](@ref)).
 
 [`ClimaComms.free_memory`](@ref) and [`ClimaComms.total_memory`](@ref)
 report bytes of memory on the device (system memory for CPU devices, GPU
-memory for `CUDADevice`):
+memory for `CUDADevice`, and the working set that Metal recommends for
+`MetalDevice`):
 
 ```julia
 device = ClimaComms.device()

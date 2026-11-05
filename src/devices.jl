@@ -18,6 +18,7 @@ Subtypes:
 - [`CPUSingleThreaded`](@ref): a CPU using a single thread.
 - [`CPUMultiThreaded`](@ref): a CPU using multiple threads.
 - [`CUDADevice`](@ref): a single CUDA-enabled GPU.
+- [`MetalDevice`](@ref): a single Apple GPU.
 
 Use [`device`](@ref) to select a device at runtime from the
 `CLIMACOMMS_DEVICE` environment variable.
@@ -51,6 +52,25 @@ Use the CPU with multiple threads.
 struct CPUMultiThreaded <: AbstractCPUDevice end
 
 """
+    AbstractGPUDevice
+
+Abstract device type for GPUs.
+
+Methods that are identical on every GPU dispatch on this type.
+
+The extension of each GPU backend defines:
+  [`compile_kernel`](@ref), [`launch_kernel`](@ref),
+  [`max_blocks_in_kernel`](@ref), [`max_threads_in_block`](@ref),
+  [`thread_index_in_kernel`](@ref), and [`threads_in_kernel`](@ref),
+  on which the GPU methods of [`@threaded`](@ref) are built.
+
+Subtypes:
+- [`CUDADevice`](@ref): a single CUDA-enabled GPU.
+- [`MetalDevice`](@ref): a single Apple GPU.
+"""
+abstract type AbstractGPUDevice <: AbstractDevice end
+
+"""
     CUDADevice()
 
 Use an NVIDIA GPU via [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl).
@@ -58,7 +78,21 @@ Use an NVIDIA GPU via [`CUDA.jl`](https://github.com/JuliaGPU/CUDA.jl).
 `CUDA.jl` must be loaded for this device to be usable; see
 [`@import_required_backends`](@ref).
 """
-struct CUDADevice <: AbstractDevice end
+struct CUDADevice <: AbstractGPUDevice end
+
+"""
+    MetalDevice()
+
+Use an Apple GPU via [`Metal.jl`](https://github.com/JuliaGPU/Metal.jl).
+
+`Metal.jl` must be loaded for this device to be usable; see
+[`@import_required_backends`](@ref). Apple GPUs do not support `Float64`.
+
+Support for `MetalDevice` is experimental. No continuous integration runs the
+tests on an Apple GPU, so a change to ClimaComms can break it without a failed
+test.
+"""
+struct MetalDevice <: AbstractGPUDevice end
 
 # ==============================================================================
 # Device selection and introspection
@@ -93,6 +127,8 @@ function device_type()
         return :CPUMultiThreaded
     elseif env_var == "CUDA"
         return :CUDADevice
+    elseif env_var == "Metal"
+        return :MetalDevice
     else
         error("Invalid CLIMACOMMS_DEVICE: $env_var")
     end
@@ -110,7 +146,8 @@ Allowed values of `CLIMACOMMS_DEVICE`:
 - `CPUSingleThreaded`;
 - `CPUMultiThreaded`;
 - `CUDA`: [`CUDADevice`](@ref), which requires `CUDA.jl` to be loaded (see
-  [`@import_required_backends`](@ref)).
+  [`@import_required_backends`](@ref));
+- `Metal`: [`MetalDevice`](@ref), which requires `Metal.jl` to be loaded.
 
 # Examples
 ```julia
@@ -126,6 +163,10 @@ function device()
         error(
             "Loading CUDA.jl is required to use CUDADevice. You might want to call ClimaComms.@import_required_backends",
         )
+    elseif target_device == :MetalDevice && !metal_ext_is_loaded()
+        error(
+            "Loading Metal.jl is required to use MetalDevice. You might want to call ClimaComms.@import_required_backends",
+        )
     end
     DeviceConstructor = getproperty(ClimaComms, target_device)
     return DeviceConstructor()
@@ -137,8 +178,8 @@ Base.summary(io::IO, device::AbstractDevice) =
 """
     ClimaComms.array_type(device::AbstractDevice)
 
-Return the base array type used by the specified device (currently `Array`
-or `CuArray`).
+Return the base array type used by the specified device (currently `Array`,
+`CuArray`, or `MtlArray`).
 
 # Examples
 ```julia
@@ -188,6 +229,15 @@ Return the bytes of memory that are theoretically available for allocation
 on the `device`.
 """
 total_memory(::AbstractCPUDevice) = Sys.total_memory()
+
+"""
+    ClimaComms.supports_float64(device)
+
+Return `true` if the `device` can store `Float64` arrays and
+evaluate `Float64` arithmetic in kernels.
+"""
+supports_float64(::AbstractDevice) = true
+supports_float64(::MetalDevice) = false
 
 # ==============================================================================
 # Device-flexible operations
@@ -268,7 +318,7 @@ end
 
 If the CPU version of the above example does not leverage
 spawned tasks (which require using `Base.sync` or `Threads.wait`
-to synchronize), then you may want to simply use [`cuda_sync`](@ref).
+to synchronize), then you may want to simply use [`device_sync`](@ref).
 """
 function sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
     Base.@sync begin
@@ -277,10 +327,10 @@ function sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
 end
 
 """
-    ClimaComms.cuda_sync(f, device, args...; kwargs...)
+    ClimaComms.device_sync(f, device, args...; kwargs...)
 
 Device-flexible version of `CUDA.@sync`; functional form of
-[`@cuda_sync`](@ref).
+[`@device_sync`](@ref).
 
 Calls
 ```julia
@@ -292,8 +342,21 @@ CUDA.@sync f(args...; kwargs...)
 ```
 for CUDA devices.
 """
-function cuda_sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
+function device_sync(f::F, ::AbstractCPUDevice, args...; kwargs...) where {F}
     f(args...; kwargs...)
+end
+
+"""
+    ClimaComms.cuda_sync(f, device, args...; kwargs...)
+
+Deprecated; use [`device_sync`](@ref).
+"""
+function cuda_sync(f::F, device::AbstractDevice, args...; kwargs...) where {F}
+    Base.depwarn(
+        "`ClimaComms.cuda_sync` and `ClimaComms.@cuda_sync` are deprecated; use `ClimaComms.device_sync` and `ClimaComms.@device_sync` instead.",
+        :cuda_sync,
+    )
+    return device_sync(f, device, args...; kwargs...)
 end
 
 """
@@ -376,7 +439,7 @@ end
 
 If the CPU version of the above example does not leverage
 spawned tasks (which require using `Base.sync` or `Threads.wait`
-to synchronize), then you may want to simply use [`@cuda_sync`](@ref).
+to synchronize), then you may want to simply use [`@device_sync`](@ref).
 """
 macro sync(device, expr)
     __CC__ = ClimaComms
@@ -384,7 +447,7 @@ macro sync(device, expr)
 end
 
 """
-    @cuda_sync device expr
+    @device_sync device expr
 
 Device-flexible `CUDA.@sync`.
 
@@ -397,6 +460,16 @@ for CPU devices and
 CUDA.@sync expr
 ```
 for CUDA devices.
+"""
+macro device_sync(device, expr)
+    __CC__ = ClimaComms
+    return :($__CC__.device_sync(() -> $(esc(expr)), $(esc(device))))
+end
+
+"""
+    @cuda_sync device expr
+
+Deprecated; use [`@device_sync`](@ref).
 """
 macro cuda_sync(device, expr)
     __CC__ = ClimaComms
@@ -436,7 +509,9 @@ for CPU devices and
 ```julia
 CUDA.@cuassert cond [text]
 ```
-for CUDA devices.
+for CUDA devices. On a Metal device, `text` is not evaluated, and a failed
+assertion in a kernel throws a `KernelException` on the host at the next
+synchronization.
 """
 macro assert(device, cond, text = nothing)
     text_func = isnothing(text) ? nothing : :(() -> $(esc(text)))
@@ -447,8 +522,8 @@ end
     ClimaComms.assert(device, cond, text)
 
 Evaluate the thunks `cond` and `text` in a device-appropriate assertion.
-Called from [`@assert`](@ref); the CUDA method is defined in
-`ClimaCommsCUDAExt`.
+Called from [`@assert`](@ref); the GPU methods are defined in the backend
+extensions, and the Metal method does not evaluate `text`.
 """
 assert(::AbstractCPUDevice, cond::C, text::T) where {C, T} =
     isnothing(text) ? (Base.@assert cond()) : (Base.@assert cond() text())
@@ -490,23 +565,30 @@ manually, with the following device-dependent behavior:
    performant). To read more about multi-threading, see the documentation for
    [`Threads.@threads`](https://docs.julialang.org/en/v1/base/multi-threading/#Base.Threads.@threads).
 
- - When `device` is a `CUDADevice()`, the loop is compiled with `CUDA.@cuda` and
-   run with `CUDA.@sync`. Since CUDA launches all threads at the same time, only
-   static scheduling can be used. Setting `coarsen` to any symbol causes each
-   thread to evaluate a single iteration (default), and setting it to an integer
-   value causes each thread to evaluate that number of iterations (the default
-   is similar to using `1`, but slightly more performant). If the total number
-   of iterations in the loop is extremely large, the specified coarsening may
-   require more threads than can be simultaneously launched on the GPU, in which
-   case the amount of coarsening is automatically increased.
+ - When `device` is an `AbstractGPUDevice`, the loop is compiled into a GPU
+   kernel and launched without waiting for it to finish; use
+   [`@device_sync`](@ref) to wait for it. Because the iterations of each thread
+   are fixed before the kernel is launched, only static scheduling can be used.
+   Setting `coarsen` to any symbol causes each thread to evaluate a single
+   iteration (default), and setting it to an integer value causes each thread to
+   evaluate that number of iterations (the default is similar to using `1`, but
+   slightly more performant). If the total number of iterations in the loop is
+   extremely large, the specified coarsening may require more threads than can
+   be simultaneously launched on the GPU, in which case the amount of
+   coarsening is automatically increased.
 
    The optional argument `block_size` is also available for manually specifying
-   the size of each block on a GPU. The default value of `:auto` sets the number
-   of threads in each block to the largest possible value that permits a high
-   GPU "occupancy" (the number of active thread warps in each multiprocessor
-   executing the kernel). An integer can be used instead of `:auto` to override
-   this default value. If the specified value exceeds the total number of
-   threads, it is automatically decreased to avoid idle threads.
+   the size of each block on a GPU. With the default value of `:auto`, the
+   backend chooses the number of threads in each block: on a `CUDADevice`, the
+   largest value that permits a high GPU "occupancy" (the number of active
+   thread warps in each multiprocessor executing the kernel), and on a
+   `MetalDevice`, the largest multiple of the SIMD width for which the loop
+   launches at least a fixed number of blocks for each GPU core, if the loop
+   has enough iterations.
+   An integer can be used instead of `:auto` to override this default value.
+   If the specified value exceeds the total number of threads, it is
+   automatically decreased to avoid idle threads. If it exceeds the number of
+   threads in a block that the kernel allows, the launch throws an error.
 
 Any iterator with methods for `firstindex`, `length`, and `getindex` can be used
 in a `@threaded` loop. All lazy iterators from `Base` and `Base.Iterators`, such
@@ -666,8 +748,8 @@ Evaluate `f` on every item of `itr`, distributed across threads according
 to the `device` and the `coarsen` scheduler.
 
 Called from [`threaded`](@ref) after the iterator has been made indexable
-by [`threadable`](@ref); the CUDA methods are defined in
-`ClimaCommsCUDAExt`.
+by [`threadable`](@ref). The methods for an [`AbstractGPUDevice`](@ref) call the
+functions that the extension of its backend defines.
 """
 run_threaded(f::F, device::AbstractCPUDevice, coarsen, itr; _...) where {F} =
     run_threaded(f, device, coarsen, itr)
@@ -721,6 +803,130 @@ function run_threaded(
             @inbounds f(itr[firstindex(itr) + item_index - 1])
         end
     end
+end
+
+"""
+    ClimaComms.compile_kernel(device::AbstractGPUDevice, f)
+
+Compile the function `f`, which takes no arguments, into a kernel for the
+`device` without launching it.
+"""
+function compile_kernel end
+
+"""
+    ClimaComms.launch_kernel(device::AbstractGPUDevice, kernel, blocks, threads_in_block)
+
+Launch a `kernel` from [`compile_kernel`](@ref) on `blocks` blocks of
+`threads_in_block` threads each, without waiting for it to finish. Throw an
+error if `threads_in_block` exceeds the number of threads in a block that the
+`kernel` allows.
+"""
+function launch_kernel end
+
+"""
+    ClimaComms.max_blocks_in_kernel(device::AbstractGPUDevice, kernel)
+
+Return the largest number of blocks with which the `kernel` can be launched,
+as a positive integer.
+"""
+function max_blocks_in_kernel end
+
+"""
+    ClimaComms.max_threads_in_block(device::AbstractGPUDevice, kernel, block_size, n_threads)
+
+Return the number of threads in each block of a launch of the `kernel`, as a
+positive `Int`, for a loop that needs `n_threads` threads; if `n_threads` is
+smaller, the launch has one block of `n_threads` threads. The argument
+`block_size` is that of [`@threaded`](@ref), either an `Int` or `Val(:auto)`.
+For an `Int`, the result is `block_size`. The extension of each GPU backend
+defines the method for `Val(:auto)`.
+"""
+function max_threads_in_block end
+
+max_threads_in_block(::AbstractGPUDevice, kernel, block_size::Int, _) =
+    block_size
+
+"""
+    ClimaComms.thread_index_in_kernel(device::AbstractGPUDevice)
+
+Return the index of the calling thread as an `Int` between 1 and
+[`threads_in_kernel`](@ref). Called from device code.
+"""
+function thread_index_in_kernel end
+
+"""
+    ClimaComms.threads_in_kernel(device::AbstractGPUDevice)
+
+Return the number of threads in the kernel being executed by the calling thread
+as an `Int`. Called from device code.
+"""
+function threads_in_kernel end
+
+function run_threaded(
+    f::F,
+    device::AbstractGPUDevice,
+    ::Val,
+    itr;
+    block_size,
+) where {F}
+    n_items = length(itr)
+    n_items > 0 || return nothing
+
+    function call_f_from_thread()
+        item_index = thread_index_in_kernel(device)
+        item_index <= n_items &&
+            @inbounds f(itr[firstindex(itr) + item_index - 1])
+        return nothing
+    end
+    kernel = compile_kernel(device, call_f_from_thread)
+    max_blocks = max_blocks_in_kernel(device, kernel)
+    threads_limit = max_threads_in_block(device, kernel, block_size, n_items)
+
+    # If there are too many items, coarsen by the smallest possible amount.
+    n_items <= max_blocks * threads_limit ||
+        return run_threaded(f, device, 1, itr; block_size)
+
+    threads_in_block = min(threads_limit, n_items)
+    blocks = cld(n_items, threads_in_block)
+    launch_kernel(device, kernel, blocks, threads_in_block)
+end
+
+function run_threaded(
+    f::F,
+    device::AbstractGPUDevice,
+    min_items_in_thread::Int,
+    itr;
+    block_size,
+) where {F}
+    min_items_in_thread > 0 || throw(ArgumentError("`coarsen` is not positive"))
+    n_items = length(itr)
+    n_items > 0 || return nothing
+
+    # Maximize memory coalescing with a "grid-stride loop"; for reference, see
+    # https://developer.nvidia.com/blog/cuda-pro-tip-write-flexible-kernels-grid-stride-loops
+    function call_f_from_thread()
+        item_indices =
+            thread_index_in_kernel(device):threads_in_kernel(device):n_items
+        for item_index in item_indices
+            @inbounds f(itr[firstindex(itr) + item_index - 1])
+        end
+        return nothing
+    end
+    kernel = compile_kernel(device, call_f_from_thread)
+    max_blocks = max_blocks_in_kernel(device, kernel)
+    max_required_threads = cld(n_items, min_items_in_thread)
+    threads_limit =
+        max_threads_in_block(device, kernel, block_size, max_required_threads)
+
+    # If there are too many items to use the specified coarsening, increase it
+    # by the smallest possible amount.
+    items_in_thread =
+        max_required_threads <= max_blocks * threads_limit ?
+        min_items_in_thread : cld(n_items, max_blocks * threads_limit)
+
+    threads_in_block = min(threads_limit, max_required_threads)
+    blocks = cld(n_items, items_in_thread * threads_in_block)
+    launch_kernel(device, kernel, blocks, threads_in_block)
 end
 
 # ==============================================================================

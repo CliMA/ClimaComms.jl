@@ -3,7 +3,7 @@
 
 Abstract the computing devices and communication contexts used by CliMA
 packages, so that the same simulation code can run on a single CPU thread,
-on multiple CPU threads, on NVIDIA GPUs, and across MPI processes.
+on multiple CPU threads, on NVIDIA and Apple GPUs, and across MPI processes.
 
 The two central abstractions are:
 - [`AbstractDevice`](@ref): the hardware a computation runs on (e.g.,
@@ -15,7 +15,7 @@ The two central abstractions are:
 Devices and contexts are selected at runtime, typically from the
 `CLIMACOMMS_DEVICE` and `CLIMACOMMS_CONTEXT` environment variables via
 [`device`](@ref) and [`context`](@ref). Backend-specific implementations
-(CUDA, MPI) live in package extensions and are loaded with
+(CUDA, Metal, MPI) live in package extensions and are loaded with
 [`@import_required_backends`](@ref).
 """
 module ClimaComms
@@ -29,8 +29,8 @@ include("adapt.jl")
 include("logging.jl")
 
 # Hint that a missing backend package is the likely cause when a
-# `ClimaComms` function has no method for a `CUDADevice` or an
-# `MPICommsContext` (its methods live in an extension that is not loaded).
+# `ClimaComms` function has no method for a `CUDADevice`, a `MetalDevice`, or
+# an `MPICommsContext` (its methods live in an extension that is not loaded).
 function _backend_hint(io, exc, argtypes, _)
     parentmodule(exc.f) === ClimaComms || return nothing
     if !cuda_ext_is_loaded() && any(T -> T <: CUDADevice, argtypes)
@@ -40,6 +40,14 @@ function _backend_hint(io, exc, argtypes, _)
              loaded. Load it with `import CUDA` (or \
              `ClimaComms.@import_required_backends`) to enable the \
              CUDA backend.",
+        )
+    elseif !metal_ext_is_loaded() && any(T -> T <: MetalDevice, argtypes)
+        print(
+            io,
+            "\n\nA `MetalDevice` argument is involved, but Metal.jl is not \
+             loaded. Load it with `import Metal` (or \
+             `ClimaComms.@import_required_backends`) to enable the \
+             Metal backend.",
         )
     elseif !mpi_ext_is_loaded() && exc.f === MPICommsContext
         print(
