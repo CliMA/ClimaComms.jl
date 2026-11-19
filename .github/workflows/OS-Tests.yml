@@ -16,9 +16,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        # Test the full declared compat range: the 1.10 LTS (the minimum
-        # in Project.toml) through the current release.
-        julia-version: ['1.10', '1.11', '1.12']
+        # The 1.10 LTS (the minimum in Project.toml) through the current release.
+        julia-version: ['1.10', '1.11', '1.13']
 
     runs-on: ${{ matrix.os }}
 

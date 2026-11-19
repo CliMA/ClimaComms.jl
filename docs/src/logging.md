@@ -12,7 +12,7 @@ Julia's standard library provides a flexible logging system through `Logging.jl`
 - **Log Level**: Indicates the severity/importance of a message
 - **Log Record**: Contains the message and associated metadata (level, module, line number, etc.)
 
-The default logger in Julia (as of v1.11) is `Logging.ConsoleLogger()`, which prints messages to the console. You can check your current logger using:
+The default logger in Julia (as of v1.13) is `Logging.ConsoleLogger()`, which prints messages to the console. You can check your current logger using:
 
 ```julia
 using Logging; current_logger()
