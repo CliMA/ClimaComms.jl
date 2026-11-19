@@ -1,0 +1,75 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="ClimaComms.jl logo">
+  <!-- Interconnects between the devices -->
+  <g stroke="#4063D8" stroke-width="6" stroke-linecap="round">
+    <line x1="100" y1="58" x2="55" y2="138"/>
+    <line x1="100" y1="58" x2="145" y2="138"/>
+    <line x1="55" y1="138" x2="145" y2="138"/>
+  </g>
+
+  <!-- Data packets in transit -->
+  <g fill="#FFFFFF" stroke="#4063D8" stroke-width="3">
+    <circle cx="81.1" cy="91.6" r="6"/>
+    <circle cx="126.1" cy="104.4" r="6"/>
+    <circle cx="105" cy="138" r="6"/>
+  </g>
+
+  <!-- Green chip (top) -->
+  <g>
+    <g stroke="#389826" stroke-width="4" stroke-linecap="round">
+      <line x1="90" y1="38" x2="90" y2="30"/>
+      <line x1="100" y1="38" x2="100" y2="30"/>
+      <line x1="110" y1="38" x2="110" y2="30"/>
+      <line x1="90" y1="78" x2="90" y2="86"/>
+      <line x1="100" y1="78" x2="100" y2="86"/>
+      <line x1="110" y1="78" x2="110" y2="86"/>
+      <line x1="80" y1="48" x2="72" y2="48"/>
+      <line x1="80" y1="58" x2="72" y2="58"/>
+      <line x1="80" y1="68" x2="72" y2="68"/>
+      <line x1="120" y1="48" x2="128" y2="48"/>
+      <line x1="120" y1="58" x2="128" y2="58"/>
+      <line x1="120" y1="68" x2="128" y2="68"/>
+    </g>
+    <rect x="80" y="38" width="40" height="40" rx="8" fill="#389826"/>
+    <rect x="91" y="49" width="18" height="18" rx="4" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  </g>
+
+  <!-- Red chip (bottom left) -->
+  <g>
+    <g stroke="#CB3C33" stroke-width="4" stroke-linecap="round">
+      <line x1="45" y1="118" x2="45" y2="110"/>
+      <line x1="55" y1="118" x2="55" y2="110"/>
+      <line x1="65" y1="118" x2="65" y2="110"/>
+      <line x1="45" y1="158" x2="45" y2="166"/>
+      <line x1="55" y1="158" x2="55" y2="166"/>
+      <line x1="65" y1="158" x2="65" y2="166"/>
+      <line x1="35" y1="128" x2="27" y2="128"/>
+      <line x1="35" y1="138" x2="27" y2="138"/>
+      <line x1="35" y1="148" x2="27" y2="148"/>
+      <line x1="75" y1="128" x2="83" y2="128"/>
+      <line x1="75" y1="138" x2="83" y2="138"/>
+      <line x1="75" y1="148" x2="83" y2="148"/>
+    </g>
+    <rect x="35" y="118" width="40" height="40" rx="8" fill="#CB3C33"/>
+    <rect x="46" y="129" width="18" height="18" rx="4" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  </g>
+
+  <!-- Purple chip (bottom right) -->
+  <g>
+    <g stroke="#9558B2" stroke-width="4" stroke-linecap="round">
+      <line x1="135" y1="118" x2="135" y2="110"/>
+      <line x1="145" y1="118" x2="145" y2="110"/>
+      <line x1="155" y1="118" x2="155" y2="110"/>
+      <line x1="135" y1="158" x2="135" y2="166"/>
+      <line x1="145" y1="158" x2="145" y2="166"/>
+      <line x1="155" y1="158" x2="155" y2="166"/>
+      <line x1="125" y1="128" x2="117" y2="128"/>
+      <line x1="125" y1="138" x2="117" y2="138"/>
+      <line x1="125" y1="148" x2="117" y2="148"/>
+      <line x1="165" y1="128" x2="173" y2="128"/>
+      <line x1="165" y1="138" x2="173" y2="138"/>
+      <line x1="165" y1="148" x2="173" y2="148"/>
+    </g>
+    <rect x="125" y="118" width="40" height="40" rx="8" fill="#9558B2"/>
+    <rect x="136" y="129" width="18" height="18" rx="4" fill="none" stroke="#FFFFFF" stroke-width="3"/>
+  </g>
+</svg>
